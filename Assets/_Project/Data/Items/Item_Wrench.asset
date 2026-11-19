@@ -24,4 +24,4 @@ MonoBehaviour:
   throwForceMultiplier: 0.9
   physicsMass: 1.2
   tintColor: {r: 0.55, g: 0.58, b: 0.62, a: 1}
-  worldPrefab: {fileID: 0}
+  worldPrefab: {fileID: 429164393863216143, guid: f7d18a09d3ac87c42a93f544b8b56aef, type: 3}
