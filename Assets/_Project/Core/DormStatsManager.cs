@@ -1,5 +1,6 @@
 using System;
 using Dormitory7.Data;
+using Dormitory7.UI;
 using UnityEngine;
 
 namespace Dormitory7.Core
@@ -51,6 +52,7 @@ namespace Dormitory7.Core
         public event Action<GameOverReason, string> OnGameOver;
 
         private float _exhaustionTimer;
+        private bool _exhaustionWarningShown;
         private DayTimeController _dayTime;
 
         public void SetConfig(BalanceConfig config)
@@ -78,6 +80,7 @@ namespace Dormitory7.Core
             GymBuffRemaining = 0f;
             CurrentNoiseLevel = 0f;
             _exhaustionTimer = 0f;
+            _exhaustionWarningShown = false;
             IsGameOver = false;
             LastGameOverReason = GameOverReason.None;
 
@@ -108,6 +111,12 @@ namespace Dormitory7.Core
 
             if (Energy <= 0.01f)
             {
+                if (!_exhaustionWarningShown)
+                {
+                    _exhaustionWarningShown = true;
+                    HudController.Instance?.ShowToast(
+                        $"КРИТИЧНЕ ВИСНАЖЕННЯ (0%)! Негайно з'їжте «Мівіну» або лягайте спати — знепритомнієте за {Mathf.RoundToInt(balanceConfig.exhaustionGameOverSeconds)}с!");
+                }
                 _exhaustionTimer += Time.deltaTime;
                 if (_exhaustionTimer >= balanceConfig.exhaustionGameOverSeconds)
                 {
@@ -117,6 +126,7 @@ namespace Dormitory7.Core
             else
             {
                 _exhaustionTimer = 0f;
+                _exhaustionWarningShown = false;
             }
         }
 

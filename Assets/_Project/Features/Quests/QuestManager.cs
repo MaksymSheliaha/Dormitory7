@@ -7,7 +7,9 @@ using Dormitory7.Features.Cockroaches;
 using Dormitory7.Features.Cooking;
 using Dormitory7.Features.Gym;
 using Dormitory7.Features.Repairs;
+using Dormitory7.Interaction;
 using Dormitory7.NPC;
+using Dormitory7.Player;
 using Dormitory7.UI;
 using UnityEngine;
 
@@ -54,6 +56,16 @@ namespace Dormitory7.Features.Quests
         [SerializeField] private List<QuestDefinition> dailyQuestPool = new List<QuestDefinition>();
         [SerializeField] private List<QuestDefinition> weeklyStepQuests = new List<QuestDefinition>();
         [SerializeField] private QuestDefinition fridayClimaxQuest;
+
+        [Header("Anti-Softlock Daily Emergency Supplies")]
+        [SerializeField] private GameObject emergencyMivinaPrefab;
+        [SerializeField] private ItemDefinition emergencyBlueTapeDef;
+
+        public void ConfigureEmergencySupplies(GameObject mivinaPrefab, ItemDefinition blueTapeDef)
+        {
+            emergencyMivinaPrefab = mivinaPrefab;
+            emergencyBlueTapeDef = blueTapeDef;
+        }
 
         public IReadOnlyList<QuestProgress> ActiveQuests => _activeQuests;
         public IReadOnlyList<FloorChatMessage> FloorChat => _chatMessages;
@@ -360,6 +372,7 @@ namespace Dormitory7.Features.Quests
         private void HandleDayAdvanced(int newDay, string _)
         {
             GenerateQuestsForDay(newDay);
+            RestockEmergencySupplies();
 
             string morningFlavor = newDay switch
             {
@@ -370,6 +383,58 @@ namespace Dormitory7.Features.Quests
                 _ => $"Новий день ({newDay}) у Гуртожитку №7!"
             };
             AddChatMessage("Сусід Вадік (к.103)", morningFlavor, isAlert: newDay >= 5);
+        }
+
+        private void RestockEmergencySupplies()
+        {
+            var inv = FindAnyObjectByType<QuickInventory>();
+            var allWorld = FindObjectsByType<WorldItem>();
+
+            // 1. Guarantee at least 1 Mivina available (in inventory or in Room 104 / world) so player can never softlock on Energy!
+            bool hasMivina = inv != null && inv.HasItemWithId("mivina");
+            if (!hasMivina)
+            {
+                for (int i = 0; i < allWorld.Length; i++)
+                {
+                    if (allWorld[i] != null && allWorld[i].gameObject.activeInHierarchy &&
+                        allWorld[i].Definition != null && allWorld[i].Definition.itemId == "mivina")
+                    {
+                        hasMivina = true;
+                        break;
+                    }
+                }
+            }
+            if (!hasMivina && emergencyMivinaPrefab != null)
+            {
+                var inst = Instantiate(emergencyMivinaPrefab, new Vector3(-10.10f, 0.90f, 4.40f), Quaternion.identity);
+                inst.name = "EmergencyMivina_Room104";
+            }
+
+            // 2. Guarantee at least 1 Blue Tape available (in inventory or world) so player can always patch a burst pipe!
+            bool hasTape = inv != null && inv.HasItemWithId("blue_tape");
+            if (!hasTape)
+            {
+                for (int i = 0; i < allWorld.Length; i++)
+                {
+                    if (allWorld[i] != null && allWorld[i].gameObject.activeInHierarchy &&
+                        allWorld[i].Definition != null && allWorld[i].Definition.itemId == "blue_tape")
+                    {
+                        hasTape = true;
+                        break;
+                    }
+                }
+            }
+            if (!hasTape && emergencyBlueTapeDef != null)
+            {
+                var tapeGo = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                tapeGo.name = "EmergencyBlueTape_Room104";
+                tapeGo.transform.position = new Vector3(-8.60f, 0.78f, 7.10f);
+                tapeGo.transform.localScale = new Vector3(0.11f, 0.04f, 0.11f);
+                var rb = tapeGo.AddComponent<Rigidbody>();
+                rb.mass = 0.2f;
+                var wi = tapeGo.AddComponent<WorldItem>();
+                wi.Initialize(emergencyBlueTapeDef);
+            }
         }
 
         private void HandleDaySummaryReady(int finishedDay, int nextDay, string endNote)

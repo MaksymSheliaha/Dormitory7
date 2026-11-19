@@ -31,7 +31,8 @@ namespace Dormitory7.Interaction
             if (context.DayTime.CurrentDay >= 5)
                 return "[E] Лягти спати — Завершити тиждень (П'ятниця!)";
 
-            return "[E] Лягти спати (+25% Енергії, наступний день)";
+            int restore = context.Stats?.Config != null ? Mathf.RoundToInt(context.Stats.Config.sleepEnergyRestore) : 30;
+            return $"[E] Лягти спати (+{restore}% Енергії, наступний день)";
         }
 
         public bool CanInteract(PlayerContext context)

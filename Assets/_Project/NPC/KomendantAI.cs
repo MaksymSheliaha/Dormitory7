@@ -477,7 +477,7 @@ namespace Dormitory7.NPC
                 return;
             }
 
-            MoveToWaypoint(_activeRoute[_routeIndex], balanceConfig.komendantPatrolSpeed);
+            MoveToWaypoint(_activeRoute[_routeIndex], EffectivePatrolSpeed);
         }
 
         private void EvaluateRoom104AndFloorTrash()
@@ -516,7 +516,7 @@ namespace Dormitory7.NPC
                     {
                         SetState(KomendantState.Patrolling);
                         if (_routeIndex >= 0 && _routeIndex < _activeRoute.Count)
-                            MoveToWaypoint(_activeRoute[_routeIndex], balanceConfig.komendantPatrolSpeed);
+                            MoveToWaypoint(_activeRoute[_routeIndex], EffectivePatrolSpeed);
                         else
                             BeginCurfewPatrol();
                     }

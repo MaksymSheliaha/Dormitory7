@@ -161,6 +161,7 @@ namespace Dormitory7.Core
             OnDaySummaryReady?.Invoke(finishedDay, CurrentDay, endNote);
         }
 
+#if UNITY_EDITOR
         public void SetDayForTesting(int day, float hour = 8f)
         {
             if (balanceConfig == null) return;
@@ -189,6 +190,7 @@ namespace Dormitory7.Core
             }
             BroadcastTimeIfChanged(force: true);
         }
+#endif
 
         private void BroadcastTimeIfChanged(bool force)
         {

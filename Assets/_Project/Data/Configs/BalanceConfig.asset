@@ -16,8 +16,8 @@ MonoBehaviour:
   maxEnergy: 100
   lowEnergyWarningThreshold: 20
   gymMinEnergyThreshold: 15
-  sleepEnergyRestore: 25
-  passiveEnergyDrainPerGameHour: 2.2
+  sleepEnergyRestore: 30
+  passiveEnergyDrainPerGameHour: 2
   sprintEnergyDrainPerSecond: 6
   exhaustionGameOverSeconds: 12
   startingRespect: 10
@@ -69,9 +69,9 @@ MonoBehaviour:
   cleanTrashReduction: 5
   disposeCockroachTrashReduction: 2.5
   cookTimeToFlipSeconds: 7
-  flipWindowSeconds: 8
+  flipWindowSeconds: 10
   cookTimeAfterFlipSeconds: 6
-  readyBeforeBurnSeconds: 9
+  readyBeforeBurnSeconds: 12
   cookedMealEnergyRestore: 50
   mivinaEnergyRestore: 25
   burnTrashPerSecond: 1.2
@@ -114,7 +114,7 @@ MonoBehaviour:
   neighborTheftRespectPenalty: 6
   neighborReclaimRespectBonus: 4
   neighborMessCooldownSeconds: 55
-  baseHazardIntervalSeconds: 110
+  baseHazardIntervalSeconds: 115
   fridayHazardIntervalMultiplier: 0.55
   fridayKomendantSpeedMultiplier: 1.22
   fridayKomendantVisionMultiplier: 1.2
