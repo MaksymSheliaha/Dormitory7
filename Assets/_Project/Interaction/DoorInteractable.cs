@@ -13,10 +13,13 @@ namespace Dormitory7.Interaction
         [SerializeField] private string lockedPrompt = "Зачинено (кімната сусідів)";
 
         private bool _isOpen;
+        private bool _openedByNpc;
+        private float _npcAutoCloseTimer;
         private Quaternion _closedRot;
         private Quaternion _openRot;
 
         public bool IsOpen => _isOpen;
+        public bool IsLocked => isLocked;
 
         public void Configure(Transform pivot, string label, float openAngle, bool locked = false, string lockedMsg = "")
         {
@@ -40,10 +43,40 @@ namespace Dormitory7.Interaction
 
         private void Update()
         {
+            if (_openedByNpc && _isOpen && _npcAutoCloseTimer > 0f)
+            {
+                _npcAutoCloseTimer -= Time.deltaTime;
+                if (_npcAutoCloseTimer <= 0f)
+                {
+                    _isOpen = false;
+                    _openedByNpc = false;
+                }
+            }
+
             if (doorPivot == null) return;
             Quaternion target = _isOpen ? _openRot : _closedRot;
             if (Quaternion.Angle(doorPivot.localRotation, target) > 0.1f)
                 doorPivot.localRotation = Quaternion.Slerp(doorPivot.localRotation, target, Time.deltaTime * swingSpeed);
+        }
+
+        public void OpenForNpc(float autoCloseDelaySeconds = 3.5f)
+        {
+            if (isLocked) return;
+            if (!_isOpen)
+            {
+                _isOpen = true;
+                _openedByNpc = true;
+            }
+            if (_openedByNpc)
+                _npcAutoCloseTimer = Mathf.Max(_npcAutoCloseTimer, autoCloseDelaySeconds);
+        }
+
+        public void SetOpen(bool open)
+        {
+            if (isLocked) return;
+            _isOpen = open;
+            _openedByNpc = false;
+            _npcAutoCloseTimer = 0f;
         }
 
         public string GetPrompt(PlayerContext context)
@@ -58,6 +91,8 @@ namespace Dormitory7.Interaction
         {
             if (isLocked) return;
             _isOpen = !_isOpen;
+            _openedByNpc = false;
+            _npcAutoCloseTimer = 0f;
         }
     }
 }
