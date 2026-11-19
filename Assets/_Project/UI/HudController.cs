@@ -1,5 +1,6 @@
 using Dormitory7.Core;
 using Dormitory7.Data;
+using Dormitory7.Features.Quests;
 using Dormitory7.Player;
 using TMPro;
 using UnityEngine;
@@ -69,6 +70,8 @@ namespace Dormitory7.UI
         [SerializeField] private TextMeshProUGUI carryBannerText;
 
         [Header("Toast & State Overlay")]
+        [SerializeField] private GameObject gameplayHudGroup;
+        [SerializeField] private TextMeshProUGUI phoneHintText;
         [SerializeField] private GameObject toastBannerRoot;
         [SerializeField] private TextMeshProUGUI toastBannerText;
         [SerializeField] private GameObject stateOverlayRoot;
@@ -89,6 +92,14 @@ namespace Dormitory7.UI
 
         private float _toastTimer;
         private bool _isQteVisible;
+        private bool _shownWelcomeToast;
+        private QuestManager _questManager;
+
+        public void BindPhoneHint(GameObject hudGroup, TextMeshProUGUI phoneHint)
+        {
+            gameplayHudGroup = hudGroup;
+            phoneHintText = phoneHint;
+        }
 
         public void BindCore(
             DormStatsManager stats,
@@ -205,6 +216,7 @@ namespace Dormitory7.UI
             if (playerInteractor == null) playerInteractor = FindAnyObjectByType<PlayerInteractor>();
             if (playerController == null) playerController = FindAnyObjectByType<FirstPersonController>();
             if (gameStateManager == null) gameStateManager = FindAnyObjectByType<GameStateManager>();
+            _questManager = FindAnyObjectByType<QuestManager>();
         }
 
         private void OnDestroy()
@@ -241,6 +253,9 @@ namespace Dormitory7.UI
             if (gameStateManager != null)
                 gameStateManager.OnStateChanged += HandleGameStateChanged;
 
+            if (_questManager != null)
+                _questManager.OnChatChanged += RefreshPhoneHint;
+
             if (resumeButton != null)
                 resumeButton.onClick.AddListener(OnResumeClicked);
             if (restartButton != null)
@@ -276,6 +291,9 @@ namespace Dormitory7.UI
             if (gameStateManager != null)
                 gameStateManager.OnStateChanged -= HandleGameStateChanged;
 
+            if (_questManager != null)
+                _questManager.OnChatChanged -= RefreshPhoneHint;
+
             if (resumeButton != null)
                 resumeButton.onClick.RemoveListener(OnResumeClicked);
             if (restartButton != null)
@@ -297,12 +315,23 @@ namespace Dormitory7.UI
                 HandleTimeChanged(dayTimeController.CurrentDay, dayTimeController.CurrentHour, dayTimeController.FormattedDayAndTime);
 
             RefreshInventoryUI();
+            RefreshPhoneHint();
             if (toastBannerRoot != null) toastBannerRoot.SetActive(false);
             if (stateOverlayRoot != null) stateOverlayRoot.SetActive(false);
             if (holdProgressContainer != null) holdProgressContainer.SetActive(false);
             if (qtePanelRoot != null) qtePanelRoot.SetActive(false);
 
-            ShowToast("Кімната №104 — Гуртожиток №7. Полюйте на тарганів, готуйте, лагодьте аварії та качайтесь у підвалі!");
+            if (gameStateManager != null)
+                HandleGameStateChanged(gameStateManager.CurrentState, gameStateManager.EndStateMessage);
+        }
+
+        private void RefreshPhoneHint()
+        {
+            if (phoneHintText == null) return;
+            int unread = _questManager != null ? _questManager.UnreadChatCount : 0;
+            phoneHintText.text = unread > 0
+                ? $"[Tab] Смартфон  <color=#FF9F43>({unread} нов.)</color>"
+                : "[Tab] Смартфон • Задачі та Чат";
         }
 
         private void Update()
@@ -581,9 +610,27 @@ namespace Dormitory7.UI
 
         private void HandleGameStateChanged(GameState state, string message)
         {
+            bool showGameplayHud = state == GameState.Playing || state == GameState.Smartphone || state == GameState.Paused;
+            if (gameplayHudGroup != null)
+                gameplayHudGroup.SetActive(showGameplayHud);
+
+            if (state == GameState.Playing && !_shownWelcomeToast)
+            {
+                _shownWelcomeToast = true;
+                ShowToast("День 1 — Гуртожиток №7! Натисніть [Tab], щоб відкрити Смартфон із задачами та чатом поверху.");
+            }
+
+            // Defer full-screen overlays to GameFlowUI when present
+            if (GameFlowUI.Instance != null)
+            {
+                if (stateOverlayRoot != null)
+                    stateOverlayRoot.SetActive(false);
+                return;
+            }
+
             if (stateOverlayRoot == null) return;
 
-            bool showOverlay = state != GameState.Playing;
+            bool showOverlay = state != GameState.Playing && state != GameState.Smartphone;
             stateOverlayRoot.SetActive(showOverlay);
             if (!showOverlay) return;
 

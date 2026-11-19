@@ -1,3 +1,4 @@
+using System;
 using Dormitory7.Core;
 using Dormitory7.Data;
 using Dormitory7.Interaction;
@@ -8,6 +9,8 @@ namespace Dormitory7.Features.Cockroaches
 {
     public class TrashBinInteractable : MonoBehaviour, IInteractable
     {
+        public static event Action OnAnyCockroachDisposed;
+
         [SerializeField] private BalanceConfig balanceConfig;
 
         public void Configure(BalanceConfig config) => balanceConfig = config;
@@ -31,6 +34,7 @@ namespace Dormitory7.Features.Cockroaches
             {
                 float relief = balanceConfig != null ? balanceConfig.disposeCockroachTrashReduction : 2.5f;
                 context.Stats?.ModifyTrash(-relief);
+                OnAnyCockroachDisposed?.Invoke();
                 HudController.Instance?.ShowToast($"Тушку таргана викинуто у смітник (-{relief:F1}% Трешу).");
             }
         }

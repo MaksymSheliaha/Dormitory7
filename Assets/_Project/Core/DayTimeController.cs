@@ -47,8 +47,13 @@ namespace Dormitory7.Core
         public event Action<int, float, string> OnTimeChanged;
         public event Action OnCurfewWarning;
         public event Action OnCurfewStarted;
+        public event Action<int, bool, string> OnDayEnding;
         public event Action<int, string> OnDayAdvanced;
+        public event Action<int, int, string> OnDaySummaryReady;
         public event Action OnWeekCompleted;
+
+        public static string GetFullDayName(int day) =>
+            DayFullNames[(Mathf.Max(1, day) - 1) % DayFullNames.Length];
 
         private int _lastReportedMinute = -1;
 
@@ -113,6 +118,8 @@ namespace Dormitory7.Core
         {
             if (IsWeekCompleted || balanceConfig == null) return;
 
+            int finishedDay = CurrentDay;
+
             // GDD 5.6: If sleeping cleanly before 22:00 with Trash <= 50%, curfew inspection is skipped!
             // If Trash > 50% when going to sleep (and not already reprimanded by Komendant), issue absentee reprimand.
             if (!forcedByKomendant && statsManager != null && statsManager.Trash > balanceConfig.komendantTrashThreshold)
@@ -121,6 +128,14 @@ namespace Dormitory7.Core
                 if (statsManager.IsGameOver)
                     return;
             }
+
+            string endNote = !string.IsNullOrEmpty(customSummary)
+                ? customSummary
+                : (forcedByKomendant
+                    ? "День завершено після вечірньої догани від Зінаїди Петрівни."
+                    : $"Спокійний сон у кімнаті №104 (+{Mathf.RoundToInt(balanceConfig.sleepEnergyRestore)}% Енергії).");
+
+            OnDayEnding?.Invoke(finishedDay, forcedByKomendant, endNote);
 
             if (statsManager != null)
                 statsManager.ApplySleepRecovery();
@@ -143,6 +158,20 @@ namespace Dormitory7.Core
                 ? customSummary
                 : $"День {CurrentDay} — {CurrentDayFullName}. Сон відновив +{Mathf.RoundToInt(balanceConfig.sleepEnergyRestore)}% Енергії.";
             OnDayAdvanced?.Invoke(CurrentDay, summary);
+            OnDaySummaryReady?.Invoke(finishedDay, CurrentDay, endNote);
+        }
+
+        public void SetDayForTesting(int day, float hour = 8f)
+        {
+            if (balanceConfig == null) return;
+            CurrentDay = Mathf.Clamp(day, 1, balanceConfig.daysInWeek);
+            CurrentHour = Mathf.Clamp(hour, 0f, 23.98f);
+            IsCurfewWarningTriggered = CurrentHour >= balanceConfig.curfewWarningHour;
+            IsCurfewActive = CurrentHour >= balanceConfig.curfewHour;
+            IsWeekCompleted = false;
+            _lastReportedMinute = -1;
+            BroadcastTimeIfChanged(force: true);
+            OnDayAdvanced?.Invoke(CurrentDay, $"День {CurrentDay} — {CurrentDayFullName}.");
         }
 
         public void SetHourForTesting(float hour)

@@ -22,6 +22,17 @@ namespace Dormitory7.Player
         private float _currentCameraY;
         private float _bobTimer;
         private bool _movementLocked;
+        private float _sensitivityMultiplier = 1f;
+
+        public const string MouseSensPrefKey = "Dorm7_MouseSensMultiplier";
+
+        public float MouseSensitivityMultiplier => _sensitivityMultiplier;
+
+        public void SetMouseSensitivityMultiplier(float mult)
+        {
+            _sensitivityMultiplier = Mathf.Clamp(mult, 0.25f, 3.0f);
+            PlayerPrefs.SetFloat(MouseSensPrefKey, _sensitivityMultiplier);
+        }
 
         private InputAction _moveAction;
         private InputAction _lookMouseAction;
@@ -55,6 +66,7 @@ namespace Dormitory7.Player
 
             _currentHeight = balanceConfig.standingHeight;
             _currentCameraY = balanceConfig.standingCameraY;
+            _sensitivityMultiplier = Mathf.Clamp(PlayerPrefs.GetFloat(MouseSensPrefKey, 1f), 0.25f, 3.0f);
             ApplyControllerHeight(_currentHeight);
 
             SetupInputActions();
@@ -136,7 +148,7 @@ namespace Dormitory7.Player
 
         private void HandleLook()
         {
-            Vector2 mouseDelta = _lookMouseAction.ReadValue<Vector2>() * balanceConfig.mouseSensitivity;
+            Vector2 mouseDelta = _lookMouseAction.ReadValue<Vector2>() * (balanceConfig.mouseSensitivity * _sensitivityMultiplier);
             Vector2 padDelta = _lookGamepadAction.ReadValue<Vector2>() * (balanceConfig.gamepadLookSpeed * Time.deltaTime);
             Vector2 totalLook = mouseDelta + padDelta;
 

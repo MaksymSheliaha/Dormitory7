@@ -1,3 +1,4 @@
+using System;
 using Dormitory7.Core;
 using Dormitory7.Data;
 using Dormitory7.Interaction;
@@ -14,6 +15,8 @@ namespace Dormitory7.Features.Cockroaches
 
     public class MessSpot : MonoBehaviour, IHoldInteractable
     {
+        public static event Action<MessSpot> OnAnyMessCleaned;
+
         [SerializeField] private BalanceConfig balanceConfig;
         [SerializeField] private MessType messType = MessType.Puddle;
 
@@ -81,6 +84,7 @@ namespace Dormitory7.Features.Cockroaches
 
             string label = messType == MessType.Puddle ? "Калюжу витерто" : "Сміття прибрано";
             HudController.Instance?.ShowToast($"{label}! (-{Mathf.RoundToInt(reduction)}% Трешу)");
+            OnAnyMessCleaned?.Invoke(this);
             gameObject.SetActive(false);
         }
 

@@ -1,3 +1,4 @@
+using System;
 using Dormitory7.Core;
 using Dormitory7.Data;
 using Dormitory7.Interaction;
@@ -18,6 +19,8 @@ namespace Dormitory7.Features.Cooking
 
     public class FryingPanState : MonoBehaviour
     {
+        public static event Action<string> OnAnyMealCooked;
+
         [SerializeField] private BalanceConfig balanceConfig;
         [SerializeField] private ItemDefinition hotPanDefinition;
         [SerializeField] private GameObject foodVisual;
@@ -191,6 +194,7 @@ namespace Dormitory7.Features.Cooking
                     else
                     {
                         State = DishState.Ready;
+                        OnAnyMealCooked?.Invoke(CurrentDishName);
                         HudController.Instance?.ShowToast($"Кухня: {CurrentDishName} ГОТОВА! Зніміть, поки не згоріла!");
                     }
                     UpdateVisuals();

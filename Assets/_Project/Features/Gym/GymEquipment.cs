@@ -1,9 +1,11 @@
+using System;
 using Dormitory7.Core;
 using Dormitory7.Data;
 using Dormitory7.Interaction;
 using Dormitory7.UI;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using Random = UnityEngine.Random;
 
 namespace Dormitory7.Features.Gym
 {
@@ -19,10 +21,15 @@ namespace Dormitory7.Features.Gym
         [SerializeField] private GymStationType stationType = GymStationType.BenchPress;
         [SerializeField] private Transform animatedBarTransform;
 
+        public static event Action<GymStationType, bool> OnAnyWorkoutCompleted;
+
         public GymStationType StationType => stationType;
         public bool IsWorkoutActive { get; private set; }
+        public bool IsBossChallengeActive { get; private set; }
         public int CompletedReps { get; private set; }
-        public int TargetReps => balanceConfig != null ? Mathf.Max(2, balanceConfig.gymRepsPerSet) : 4;
+        public int TargetReps => IsBossChallengeActive
+            ? (balanceConfig != null ? Mathf.Max(4, balanceConfig.fridayBossChallengeReps) : 6)
+            : (balanceConfig != null ? Mathf.Max(2, balanceConfig.gymRepsPerSet) : 4);
         public float BalanceValue { get; private set; } // -1..+1
 
         private DormStatsManager _stats;
@@ -113,12 +120,18 @@ namespace Dormitory7.Features.Gym
             StartWorkout(context);
         }
 
-        public void StartWorkout(PlayerContext context)
+        public void StartBossChallenge(PlayerContext context)
+        {
+            StartWorkout(context, isBossChallenge: true);
+        }
+
+        public void StartWorkout(PlayerContext context, bool isBossChallenge = false)
         {
             _ctx = context;
             if (_stats == null) _stats = context.Stats ?? FindAnyObjectByType<DormStatsManager>();
 
             IsWorkoutActive = true;
+            IsBossChallengeActive = isBossChallenge;
             CompletedReps = 0;
             _missCount = 0;
             BalanceValue = 0f;
@@ -230,24 +243,32 @@ namespace Dormitory7.Features.Gym
 
         public void TriggerWorkoutSuccess()
         {
+            bool wasBossChallenge = IsBossChallengeActive;
             StopWorkoutCleanly();
             if (_stats == null || balanceConfig == null) return;
 
             bool buffed = _stats.HasGymBuff;
             float energyCost = balanceConfig.gymWorkoutEnergyCost * _stats.StaminaDrainMultiplier * (buffed ? 0.75f : 1f);
             _stats.ModifyEnergy(-energyCost);
-            _stats.ModifyRespect(balanceConfig.gymSuccessRespect);
+
+            float respectReward = wasBossChallenge
+                ? balanceConfig.fridayBossChallengeRespect
+                : balanceConfig.gymSuccessRespect;
+            _stats.ModifyRespect(respectReward);
 
             if (stationType == GymStationType.BenchPress)
             {
                 _stats.ImproveStrength(1);
-                HudController.Instance?.ShowToast($"Жим виконано! Сила: {_stats.Strength}/5 • +{Mathf.RoundToInt(balanceConfig.gymSuccessRespect)} Респекту!");
+                string prefix = wasBossChallenge ? "ФІНАЛЬНИЙ ЖИМ З БОСОМ ВИГРАНО!" : "Жим виконано!";
+                HudController.Instance?.ShowToast($"{prefix} Сила: {_stats.Strength}/5 • +{Mathf.RoundToInt(respectReward)} Респекту!");
             }
             else
             {
                 _stats.ImproveStamina(1);
-                HudController.Instance?.ShowToast($"Турнік виконано! Витривалість: {_stats.Stamina}/5 • +{Mathf.RoundToInt(balanceConfig.gymSuccessRespect)} Респекту!");
+                HudController.Instance?.ShowToast($"Турнік виконано! Витривалість: {_stats.Stamina}/5 • +{Mathf.RoundToInt(respectReward)} Респекту!");
             }
+
+            OnAnyWorkoutCompleted?.Invoke(stationType, wasBossChallenge);
         }
 
         public void TriggerWorkoutFail()
@@ -268,6 +289,7 @@ namespace Dormitory7.Features.Gym
         {
             GameStateManager.Instance?.UnregisterActiveQte(CancelWorkoutFromEsc);
             IsWorkoutActive = false;
+            IsBossChallengeActive = false;
             _balanceAxisAction.Disable();
             _pushAction.Disable();
             _cancelAction.Disable();
@@ -280,9 +302,11 @@ namespace Dormitory7.Features.Gym
 
         private void PushHudQte()
         {
-            string title = stationType == GymStationType.BenchPress
-                ? $"ЖИМ ШТАНГИ ({CompletedReps}/{TargetReps})"
-                : $"ТУРНІК ({CompletedReps}/{TargetReps})";
+            string title = IsBossChallengeActive
+                ? $"ФІНАЛЬНИЙ ВИКЛИК БОСА: ЖИМ ({CompletedReps}/{TargetReps})"
+                : (stationType == GymStationType.BenchPress
+                    ? $"ЖИМ ШТАНГИ ({CompletedReps}/{TargetReps})"
+                    : $"ТУРНІК ({CompletedReps}/{TargetReps})");
 
             HudController.Instance?.ShowQte(new QteDisplayState
             {

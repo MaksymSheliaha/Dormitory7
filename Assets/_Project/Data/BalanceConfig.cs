@@ -135,5 +135,13 @@ namespace Dormitory7.Data
         public float neighborTheftRespectPenalty = 6f;
         public float neighborReclaimRespectBonus = 4f;
         public float neighborMessCooldownSeconds = 55f;
+
+        [Header("Week 3 — Quests, Escalation & Friday Climax")]
+        public float baseHazardIntervalSeconds = 110f;
+        public float fridayHazardIntervalMultiplier = 0.55f;
+        public float fridayKomendantSpeedMultiplier = 1.22f;
+        public float fridayKomendantVisionMultiplier = 1.20f;
+        public int fridayBossChallengeReps = 6;
+        public float fridayBossChallengeRespect = 18f;
     }
 }

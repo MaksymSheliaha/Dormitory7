@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4d86d37f8deb71c40b2f003d94506273, type: 3}
+  m_Name: Quest_Daily_Clean
+  m_EditorClassIdentifier: Assembly-CSharp::Dormitory7.Features.Quests.QuestDefinition
+  questId: daily_clean
+  title: "\u0427\u0438\u0441\u0442\u0438\u0439 \u043A\u043E\u0440\u0438\u0434\u043E\u0440"
+  description: "\u041F\u0440\u0438\u0431\u0435\u0440\u0456\u0442\u044C \u043A\u0430\u043B\u044E\u0436\u0443/\u0441\u043C\u0456\u0442\u0442\u044F \u0448\u0432\u0430\u0431\u0440\u043E\u044E \u0430\u0431\u043E \u0432\u0438\u043A\u0438\u043D\u044C\u0442\u0435 \u0442\u0443\u0448\u043A\u0443 \u0442\u0430\u0440\u0433\u0430\u043D\u0430 \u0443 \u0441\u043C\u0456\u0442\u043D\u0438\u043A."
+  category: 0
+  objectiveType: 5
+  targetCount: 1
+  minDay: 1
+  maxDay: 5
+  respectReward: 5
+  trashReliefReward: 4

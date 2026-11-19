@@ -1,9 +1,11 @@
+using System;
 using System.Collections.Generic;
 using Dormitory7.Core;
 using Dormitory7.Data;
 using Dormitory7.Interaction;
 using Dormitory7.UI;
 using UnityEngine;
+using Random = UnityEngine.Random;
 
 namespace Dormitory7.Features.Cockroaches
 {
@@ -17,6 +19,7 @@ namespace Dormitory7.Features.Cockroaches
     public class CockroachAI : MonoBehaviour, IInteractable
     {
         public static readonly List<CockroachAI> LivingCockroaches = new List<CockroachAI>();
+        public static event Action<CockroachAI> OnAnyCockroachKilled;
 
         [SerializeField] private BalanceConfig balanceConfig;
         [SerializeField] private ItemDefinition deadCockroachItem;
@@ -265,6 +268,7 @@ namespace Dormitory7.Features.Cockroaches
             }
             if (greenSplatVisual != null)
                 greenSplatVisual.SetActive(true);
+            OnAnyCockroachKilled?.Invoke(this);
         }
 
         public string GetPrompt(PlayerContext context)

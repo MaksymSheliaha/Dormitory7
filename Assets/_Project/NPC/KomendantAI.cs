@@ -37,6 +37,19 @@ namespace Dormitory7.NPC
         public float DangerLevel { get; private set; }
         public bool IsPatrolActive => State != KomendantState.Waiting;
         public bool HasCheckedRoom104ThisPatrol { get; private set; }
+        public bool IsFridayClimax => dayTimeController != null && dayTimeController.CurrentDay >= 5;
+
+        public float EffectivePatrolSpeed =>
+            (balanceConfig != null ? balanceConfig.komendantPatrolSpeed : 2.6f) *
+            (IsFridayClimax && balanceConfig != null ? balanceConfig.fridayKomendantSpeedMultiplier : 1f);
+
+        public float EffectiveChaseSpeed =>
+            (balanceConfig != null ? balanceConfig.komendantChaseSpeed : 4.4f) *
+            (IsFridayClimax && balanceConfig != null ? balanceConfig.fridayKomendantSpeedMultiplier : 1f);
+
+        public float EffectiveVisionBaseRange =>
+            (balanceConfig != null ? balanceConfig.komendantVisionRange : 11.5f) *
+            (IsFridayClimax && balanceConfig != null ? balanceConfig.fridayKomendantVisionMultiplier : 1f);
 
         public bool CanAcceptBribe =>
             BribesUsedThisWeek < (balanceConfig != null ? balanceConfig.komendantWeeklyBribeLimit : 1);
@@ -186,7 +199,12 @@ namespace Dormitory7.NPC
             if (_activeRoute.Count > 0)
             {
                 _routeIndex = 0;
-                MoveToWaypoint(_activeRoute[0], balanceConfig.komendantPatrolSpeed);
+                MoveToWaypoint(_activeRoute[0], EffectivePatrolSpeed);
+            }
+
+            if (IsFridayClimax)
+            {
+                HudController.Instance?.ShowToast("П'ЯТНИЧНА ГЕНЕРАЛЬНА ПЕРЕВІРКА! Зінаїда Петрівна йде швидше й дивиться уважніше!");
             }
         }
 
@@ -303,7 +321,7 @@ namespace Dormitory7.NPC
                     SetState(KomendantState.Chasing);
                     HudController.Instance?.ShowToast("Зінаїда Петрівна ПОМІТИЛА ВАС! Тікайте або відкупіться Шоколадкою/Кавою!");
                 }
-                MoveToPosition(_playerTransform.position, balanceConfig.komendantChaseSpeed);
+                MoveToPosition(_playerTransform.position, EffectiveChaseSpeed);
                 return;
             }
 
@@ -358,7 +376,7 @@ namespace Dormitory7.NPC
             Vector3 toTarget = target - origin;
             float dist = toTarget.magnitude;
 
-            float effectiveRange = balanceConfig.komendantVisionRange;
+            float effectiveRange = EffectiveVisionBaseRange;
 
             // Turning OFF Room 104 light significantly lowers visibility inside Room 104
             if (IsPositionInsideRoom104(_playerTransform.position) && room104LightSwitch != null && !room104LightSwitch.IsOn)
@@ -503,7 +521,7 @@ namespace Dormitory7.NPC
             {
                 _investigateTarget = _playerTransform.position;
                 _suspicionTimer = balanceConfig.komendantSuspicionSeconds;
-                MoveToPosition(_playerTransform.position, balanceConfig.komendantChaseSpeed);
+                MoveToPosition(_playerTransform.position, EffectiveChaseSpeed);
             }
             else
             {

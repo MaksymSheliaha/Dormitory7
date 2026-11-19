@@ -1,6 +1,7 @@
 using System;
 using Dormitory7.Core;
 using Dormitory7.Data;
+using Dormitory7.Features.Gym;
 using Dormitory7.Interaction;
 using Dormitory7.UI;
 using TMPro;
@@ -36,6 +37,10 @@ namespace Dormitory7.NPC
         public GymBossScheduleSlot CurrentSlot { get; private set; } = GymBossScheduleSlot.MorningShower;
         public bool GreetedToday { get; private set; }
         public int GiftsGivenToday { get; private set; }
+        public bool HasCompletedFridayChallenge { get; private set; }
+
+        public bool IsFridayClimax => dayTimeController != null && dayTimeController.CurrentDay >= 5;
+        public bool IsFridayChallengeAvailable => IsFridayClimax && !HasCompletedFridayChallenge;
 
         public bool IsInMorningBonusWindow =>
             CurrentSlot == GymBossScheduleSlot.MorningShower ||
@@ -44,10 +49,32 @@ namespace Dormitory7.NPC
         public event Action<GymBossMood> OnMoodChanged;
         public event Action<bool, float> OnPlayerGreeted;
         public event Action<ItemDefinition, float> OnGiftReceived;
+        public event Action OnFridayChallengeWon;
 
         private bool _scheduleInitialized;
         private float _handshakeAnimTimer;
         private Transform _playerTransform;
+
+        private void OnEnable()
+        {
+            GymEquipment.OnAnyWorkoutCompleted += HandleWorkoutCompleted;
+        }
+
+        private void OnDisable()
+        {
+            GymEquipment.OnAnyWorkoutCompleted -= HandleWorkoutCompleted;
+        }
+
+        private void HandleWorkoutCompleted(GymStationType station, bool wasBossChallenge)
+        {
+            if (wasBossChallenge && !HasCompletedFridayChallenge)
+            {
+                HasCompletedFridayChallenge = true;
+                SetMood(GymBossMood.Pleased);
+                _handshakeAnimTimer = 1.0f;
+                OnFridayChallengeWon?.Invoke();
+            }
+        }
 
         private static readonly Color MoodNeutralColor = new Color(0.85f, 0.78f, 0.45f, 1f);
         private static readonly Color MoodPleasedColor = new Color(0.28f, 0.82f, 0.38f, 1f);
@@ -270,6 +297,13 @@ namespace Dormitory7.NPC
                 return $"[E] Привітатися з Босом качалки за руку (+{normal} Респекту)";
             }
 
+            if (IsFridayChallengeAvailable)
+            {
+                if (context.Stats != null && !context.Stats.CanTrainInGym)
+                    return "П'ятничний виклик Боса: потрібно мінімум 15% Енергії для фінального жиму!";
+                return "[E] П'ЯТНИЧНИЙ ВИКЛИК БОСА: Фінальний підхід на жимі (+18 Респекту!)";
+            }
+
             string moodStr = Mood switch
             {
                 GymBossMood.Pleased => "Задоволений",
@@ -284,7 +318,11 @@ namespace Dormitory7.NPC
             ItemDefinition active = context.ActiveItem;
             if (active != null && active.IsBossGift)
                 return true;
-            return !GreetedToday;
+            if (!GreetedToday)
+                return true;
+            if (IsFridayChallengeAvailable && !context.IsCarryingTwoHanded && context.Stats != null && context.Stats.CanTrainInGym)
+                return true;
+            return false;
         }
 
         public void Interact(PlayerContext context)
@@ -329,7 +367,30 @@ namespace Dormitory7.NPC
                     ? $"ЛЯПАС ДОЛОНЯМИ! Бос у душі оцінив сміливість та етикет! (x2: +{Mathf.RoundToInt(gain)} Респекту)"
                     : $"Чоловіче рукостискання з Босом качалки! (+{Mathf.RoundToInt(gain)} Респекту)";
                 HudController.Instance?.ShowToast(msg);
+                return;
             }
+
+            // Priority 3: Friday Climax — Final Bench Press Showdown!
+            if (IsFridayChallengeAvailable && !context.IsCarryingTwoHanded)
+            {
+                GymEquipment bench = FindBenchPress();
+                if (bench != null)
+                {
+                    HudController.Instance?.ShowToast("БОС КАЧАЛКИ: «П'ятничний екзамен! Покажи, на що здатен на жимі!»");
+                    bench.StartBossChallenge(context);
+                }
+            }
+        }
+
+        private static GymEquipment FindBenchPress()
+        {
+            var stations = FindObjectsByType<GymEquipment>();
+            for (int i = 0; i < stations.Length; i++)
+            {
+                if (stations[i] != null && stations[i].StationType == GymStationType.BenchPress)
+                    return stations[i];
+            }
+            return stations.Length > 0 ? stations[0] : null;
         }
     }
 }

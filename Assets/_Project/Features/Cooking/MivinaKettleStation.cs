@@ -1,3 +1,4 @@
+using System;
 using Dormitory7.Data;
 using Dormitory7.Interaction;
 using Dormitory7.UI;
@@ -7,6 +8,8 @@ namespace Dormitory7.Features.Cooking
 {
     public class MivinaKettleStation : MonoBehaviour, IInteractable
     {
+        public static event Action OnAnyMivinaBrewed;
+
         [SerializeField] private BalanceConfig balanceConfig;
 
         public void Configure(BalanceConfig config) => balanceConfig = config;
@@ -30,6 +33,7 @@ namespace Dormitory7.Features.Cooking
             {
                 float restore = balanceConfig != null ? balanceConfig.mivinaEnergyRestore : 25f;
                 context.Stats?.ModifyEnergy(restore);
+                OnAnyMivinaBrewed?.Invoke();
                 HudController.Instance?.ShowToast($"Заварено «Мівіну»! (+{Mathf.RoundToInt(restore)}% Енергії)");
             }
         }

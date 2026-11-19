@@ -40,6 +40,7 @@ namespace Dormitory7.Features.Repairs
         public float TempPatchRemaining { get; private set; }
         public bool IsBroken => State == HazardState.Broken || State == HazardState.Repairing;
 
+        public static event Action<RepairableHazard, bool> OnAnyHazardRepaired;
         public event Action<RepairableHazard, HazardState> OnHazardStateChanged;
 
         private DormStatsManager _stats;
@@ -333,11 +334,13 @@ namespace Dormitory7.Features.Repairs
             {
                 TempPatchRemaining = balanceConfig != null ? balanceConfig.tempTapePatchSeconds : 55f;
                 SetState(HazardState.TemporarilyPatched);
+                OnAnyHazardRepaired?.Invoke(this, false);
                 HudController.Instance?.ShowToast($"Трубу тимчасово замотано ізолентою ({Mathf.RoundToInt(TempPatchRemaining)}с)! Знайдіть ключ.");
             }
             else
             {
                 SetState(HazardState.Repaired);
+                OnAnyHazardRepaired?.Invoke(this, true);
                 HudController.Instance?.ShowToast($"{GetHazardDisplayName()} — ВІДРЕМОНТОВАНО надовго! (-Треш)");
             }
         }
