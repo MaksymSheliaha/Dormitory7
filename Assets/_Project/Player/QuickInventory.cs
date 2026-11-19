@@ -33,14 +33,23 @@ namespace Dormitory7.Player
 
         private float _swingAnimTimer;
         private Vector3 _smallAnchorRestPos;
+        private bool _isHoldingUse;
+        private WorldItem _heldUseItem;
+        private bool _inputLocked;
 
         public int ActiveSlotIndex => _activeSlotIndex;
         public bool IsCarryingTwoHanded => _carriedTwoHandedItem != null;
         public WorldItem CarriedTwoHandedItem => _carriedTwoHandedItem;
+        public bool IsUsingActiveItem => _isHoldingUse;
+        public BalanceConfig Config => balanceConfig;
+        public Transform CameraTransform => cameraTransform;
 
         public event Action OnInventoryChanged;
         public event Action<int> OnActiveSlotChanged;
         public event Action<WorldItem> OnItemUsed;
+        public event Action<WorldItem> OnItemUseStarted;
+        public event Action<WorldItem, float> OnItemUseHeld;
+        public event Action<WorldItem> OnItemUseReleased;
         public event Action<string> OnInventoryNotification;
 
         public void SetReferences(
@@ -57,6 +66,19 @@ namespace Dormitory7.Player
             twoHandAnchor = twoHandsAnchor;
             holsterRoot = holster;
             statsManager = stats;
+        }
+
+        public void SetInputLocked(bool locked)
+        {
+            _inputLocked = locked;
+            if (locked)
+                ReleaseUseIfHolding();
+        }
+
+        public void NotifyMessage(string message)
+        {
+            if (!string.IsNullOrEmpty(message))
+                OnInventoryNotification?.Invoke(message);
         }
 
         private void Awake()
@@ -110,6 +132,7 @@ namespace Dormitory7.Player
 
         private void OnDisable()
         {
+            ReleaseUseIfHolding();
             _slot1Action?.Disable();
             _slot2Action?.Disable();
             _slot3Action?.Disable();
@@ -135,20 +158,67 @@ namespace Dormitory7.Player
         private void Update()
         {
             if (GameStateManager.Instance != null && GameStateManager.Instance.CurrentState != GameState.Playing)
+            {
+                ReleaseUseIfHolding();
                 return;
+            }
+
+            if (_inputLocked)
+            {
+                ReleaseUseIfHolding();
+                UpdateHandSwingAnimation();
+                return;
+            }
 
             HandleSlotSelection();
 
             if (_dropAction.WasPressedThisFrame())
+            {
+                ReleaseUseIfHolding();
                 DropActiveOrCarriedItem();
+            }
 
             if (_throwAction.WasPressedThisFrame())
+            {
+                ReleaseUseIfHolding();
                 ThrowActiveOrCarriedItem();
+            }
 
-            if (_useAction.WasPressedThisFrame())
-                UseActiveItem();
-
+            HandleUseInput();
             UpdateHandSwingAnimation();
+        }
+
+        private void HandleUseInput()
+        {
+            if (_useAction.WasPressedThisFrame())
+            {
+                UseActiveItem();
+            }
+            else if (_isHoldingUse && _useAction.IsPressed())
+            {
+                WorldItem current = GetActiveWorldItem();
+                if (current == null || current != _heldUseItem)
+                {
+                    ReleaseUseIfHolding();
+                }
+                else
+                {
+                    OnItemUseHeld?.Invoke(current, Time.deltaTime);
+                }
+            }
+            else if (_isHoldingUse && !_useAction.IsPressed())
+            {
+                ReleaseUseIfHolding();
+            }
+        }
+
+        private void ReleaseUseIfHolding()
+        {
+            if (!_isHoldingUse) return;
+            WorldItem released = _heldUseItem;
+            _isHoldingUse = false;
+            _heldUseItem = null;
+            OnItemUseReleased?.Invoke(released);
         }
 
         private void HandleSlotSelection()
@@ -172,6 +242,7 @@ namespace Dormitory7.Player
             if (index < 0 || index >= SlotCount) return;
             if (_activeSlotIndex == index) return;
 
+            ReleaseUseIfHolding();
             _activeSlotIndex = index;
             RefreshHeldVisuals();
             OnActiveSlotChanged?.Invoke(_activeSlotIndex);
@@ -179,6 +250,37 @@ namespace Dormitory7.Player
         }
 
         public bool HasFreeSmallSlot() => FindFreeSlotIndex() >= 0;
+
+        public bool HasItemWithId(string itemId)
+        {
+            if (string.IsNullOrEmpty(itemId)) return false;
+            if (_carriedTwoHandedItem != null && _carriedTwoHandedItem.Definition != null && _carriedTwoHandedItem.Definition.itemId == itemId)
+                return true;
+            for (int i = 0; i < SlotCount; i++)
+            {
+                if (_slots[i] != null && _slots[i].Definition != null && _slots[i].Definition.itemId == itemId)
+                    return true;
+            }
+            return false;
+        }
+
+        public bool HasActiveItemWithId(string itemId)
+        {
+            var def = GetActiveItemDefinition();
+            return def != null && def.itemId == itemId;
+        }
+
+        public bool HasItemWithTag(ItemTag tag)
+        {
+            if (_carriedTwoHandedItem != null && _carriedTwoHandedItem.Definition != null && _carriedTwoHandedItem.Definition.HasTag(tag))
+                return true;
+            for (int i = 0; i < SlotCount; i++)
+            {
+                if (_slots[i] != null && _slots[i].Definition != null && _slots[i].Definition.HasTag(tag))
+                    return true;
+            }
+            return false;
+        }
 
         public ItemDefinition GetSlotItemDefinition(int slotIndex)
         {
@@ -207,6 +309,7 @@ namespace Dormitory7.Player
                 if (_carriedTwoHandedItem != null)
                     return false;
 
+                ReleaseUseIfHolding();
                 _carriedTwoHandedItem = item;
                 _carriedTwoHandedItem.OnItemCooled += HandleCarriedItemCooled;
                 RefreshHeldVisuals();
@@ -227,12 +330,101 @@ namespace Dormitory7.Player
             return true;
         }
 
+        public bool TrySpawnAndAddItem(ItemDefinition def, Vector3 visualScale)
+        {
+            if (def == null) return false;
+            if (def.carryType == ItemCarryType.TwoHandedCarry && _carriedTwoHandedItem != null) return false;
+            if (def.carryType == ItemCarryType.SmallInventory && (_carriedTwoHandedItem != null || !HasFreeSmallSlot())) return false;
+
+            GameObject go;
+            if (def.worldPrefab != null)
+            {
+                go = Instantiate(def.worldPrefab);
+            }
+            else
+            {
+                go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                go.transform.localScale = visualScale;
+                var rb = go.AddComponent<Rigidbody>();
+                rb.mass = Mathf.Max(0.2f, def.physicsMass);
+                go.AddComponent<WorldItem>();
+            }
+
+            go.name = $"WorldItem_{def.itemId}";
+            var worldItem = go.GetComponent<WorldItem>() ?? go.AddComponent<WorldItem>();
+            worldItem.Initialize(def);
+            return TryPickUp(worldItem);
+        }
+
+        public WorldItem DetachActiveItemForWorld()
+        {
+            ReleaseUseIfHolding();
+            WorldItem item = null;
+            if (_carriedTwoHandedItem != null)
+            {
+                item = _carriedTwoHandedItem;
+                _carriedTwoHandedItem.OnItemCooled -= HandleCarriedItemCooled;
+                _carriedTwoHandedItem = null;
+            }
+            else if (_slots[_activeSlotIndex] != null)
+            {
+                item = _slots[_activeSlotIndex];
+                _slots[_activeSlotIndex] = null;
+            }
+
+            if (item != null)
+            {
+                RefreshHeldVisuals();
+                OnInventoryChanged?.Invoke();
+            }
+            return item;
+        }
+
+        public bool TryConsumeActiveItem()
+        {
+            WorldItem item = DetachActiveItemForWorld();
+            if (item == null) return false;
+            Destroy(item.gameObject);
+            return true;
+        }
+
+        public bool TryConsumeItemById(string itemId)
+        {
+            if (string.IsNullOrEmpty(itemId)) return false;
+
+            if (_carriedTwoHandedItem != null && _carriedTwoHandedItem.Definition != null && _carriedTwoHandedItem.Definition.itemId == itemId)
+                return TryConsumeActiveItem();
+
+            if (_slots[_activeSlotIndex] != null && _slots[_activeSlotIndex].Definition != null && _slots[_activeSlotIndex].Definition.itemId == itemId)
+            {
+                WorldItem active = _slots[_activeSlotIndex];
+                _slots[_activeSlotIndex] = null;
+                Destroy(active.gameObject);
+                RefreshHeldVisuals();
+                OnInventoryChanged?.Invoke();
+                return true;
+            }
+
+            for (int i = 0; i < SlotCount; i++)
+            {
+                if (_slots[i] != null && _slots[i].Definition != null && _slots[i].Definition.itemId == itemId)
+                {
+                    WorldItem found = _slots[i];
+                    _slots[i] = null;
+                    Destroy(found.gameObject);
+                    RefreshHeldVisuals();
+                    OnInventoryChanged?.Invoke();
+                    return true;
+                }
+            }
+            return false;
+        }
+
         private void HandleCarriedItemCooled(WorldItem item, ItemDefinition cooledDef)
         {
             if (item != _carriedTwoHandedItem) return;
             item.OnItemCooled -= HandleCarriedItemCooled;
 
-            // Fixed decision #1: once the hot frying pan cools down, it becomes a SmallInventory item
             if (cooledDef != null && cooledDef.carryType == ItemCarryType.SmallInventory)
             {
                 int freeSlot = _slots[_activeSlotIndex] == null ? _activeSlotIndex : FindFreeSlotIndex();
@@ -252,31 +444,12 @@ namespace Dormitory7.Player
             }
         }
 
-        public bool DropActiveOrCarriedItem()
-        {
-            return ReleaseCurrentItem(isThrow: false);
-        }
-
-        public bool ThrowActiveOrCarriedItem()
-        {
-            return ReleaseCurrentItem(isThrow: true);
-        }
+        public bool DropActiveOrCarriedItem() => ReleaseCurrentItem(isThrow: false);
+        public bool ThrowActiveOrCarriedItem() => ReleaseCurrentItem(isThrow: true);
 
         private bool ReleaseCurrentItem(bool isThrow)
         {
-            WorldItem item = null;
-            if (_carriedTwoHandedItem != null)
-            {
-                item = _carriedTwoHandedItem;
-                _carriedTwoHandedItem.OnItemCooled -= HandleCarriedItemCooled;
-                _carriedTwoHandedItem = null;
-            }
-            else if (_slots[_activeSlotIndex] != null)
-            {
-                item = _slots[_activeSlotIndex];
-                _slots[_activeSlotIndex] = null;
-            }
-
+            WorldItem item = DetachActiveItemForWorld();
             if (item == null) return false;
 
             Transform origin = cameraTransform != null ? cameraTransform : transform;
@@ -299,7 +472,6 @@ namespace Dormitory7.Player
             }
             else
             {
-                // Neat placement: if aiming at an upward surface (table, stove, floor) within reach, set it down cleanly
                 float halfHeight = EstimateItemHalfHeight(item);
                 spawnRot = Quaternion.Euler(0f, origin.eulerAngles.y, 0f);
                 linearVel = Vector3.zero;
@@ -322,8 +494,6 @@ namespace Dormitory7.Player
             }
 
             item.ReleaseToWorld(spawnPos, spawnRot, linearVel, angularVel);
-            RefreshHeldVisuals();
-            OnInventoryChanged?.Invoke();
             return true;
         }
 
@@ -367,30 +537,27 @@ namespace Dormitory7.Player
 
             _swingAnimTimer = 0.18f;
 
-            // Consumable food/coffee restores Energy right away
+            // Consumable food / coffee / energy drink / Mivina restores Energy right away
             if (active.Definition.HasTag(ItemTag.Food) && active.Definition.energyRestore > 0f && statsManager != null)
             {
                 float restore = active.Definition.energyRestore;
                 string itemName = active.Definition.displayName;
+                bool givesGymBuff = active.Definition.itemId == "coffee" || active.Definition.itemId == "energy_drink";
+
                 statsManager.ModifyEnergy(restore);
+                if (givesGymBuff)
+                    statsManager.ApplyGymBuff(balanceConfig.gymBuffDurationSeconds);
 
-                if (active == _carriedTwoHandedItem)
-                {
-                    _carriedTwoHandedItem.OnItemCooled -= HandleCarriedItemCooled;
-                    _carriedTwoHandedItem = null;
-                }
-                else
-                {
-                    _slots[_activeSlotIndex] = null;
-                }
+                TryConsumeActiveItem();
 
-                Destroy(active.gameObject);
-                RefreshHeldVisuals();
-                OnInventoryChanged?.Invoke();
-                OnInventoryNotification?.Invoke($"Вжито: {itemName} (+{Mathf.RoundToInt(restore)}% Енергії)");
+                string buffMsg = givesGymBuff ? " + БАФ КАЧАЛКИ (90с)!" : "";
+                OnInventoryNotification?.Invoke($"Вжито: {itemName} (+{Mathf.RoundToInt(restore)}% Енергії){buffMsg}");
                 return true;
             }
 
+            _isHoldingUse = true;
+            _heldUseItem = active;
+            OnItemUseStarted?.Invoke(active);
             OnItemUsed?.Invoke(active);
             return true;
         }

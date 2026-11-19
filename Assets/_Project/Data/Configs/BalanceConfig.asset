@@ -53,3 +53,39 @@ MonoBehaviour:
   baseThrowForce: 9.5
   throwUpwardBoost: 2.2
   hotPanCoolingSeconds: 18
+  cockroachPatrolSpeed: 1.55
+  cockroachFleeSpeed: 3.5
+  cockroachFleePlayerDistance: 3.2
+  cockroachLightFleeDistance: 4.6
+  cockroachHealth: 1
+  slipperMeleeRange: 2.3
+  slipperMeleeDamage: 1.2
+  fryingPanMeleeRange: 2.4
+  fryingPanMeleeDamage: 1.8
+  dichlorvosRange: 3.2
+  dichlorvosDps: 2.2
+  messTrashPerMinute: 0.8
+  cleanHoldSeconds: 1.8
+  cleanTrashReduction: 5
+  disposeCockroachTrashReduction: 2.5
+  cookTimeToFlipSeconds: 7
+  flipWindowSeconds: 8
+  cookTimeAfterFlipSeconds: 6
+  readyBeforeBurnSeconds: 9
+  cookedMealEnergyRestore: 50
+  mivinaEnergyRestore: 25
+  burnTrashPerSecond: 1.2
+  pipeBurstTrashPerMinute: 2.5
+  cloggedToiletTrashPerMinute: 2
+  electricalTripTrashPerMinute: 1.8
+  tempTapePatchSeconds: 55
+  repairBaseProgressSpeed: 0.28
+  repairEnergyCost: 8
+  repairTrashRelief: 7
+  gymWorkoutEnergyCost: 14
+  gymRepsPerSet: 4
+  gymSuccessRespect: 6
+  gymFailEnergyPenalty: 15
+  gymFailRespectPenalty: 5
+  gymBuffDurationSeconds: 90
+  gymBuffZoneBonus: 0.12

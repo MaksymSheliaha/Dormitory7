@@ -23,6 +23,10 @@ namespace Dormitory7.Core
         public int Reprimands { get; private set; }
         public int Strength { get; private set; } = 1;
         public int Stamina { get; private set; } = 1;
+        public float GymBuffRemaining { get; private set; }
+        public bool HasGymBuff => GymBuffRemaining > 0f;
+        public float StrengthSpeedMultiplier => 1f + (Strength - 1) * 0.22f;
+        public float StaminaDrainMultiplier => 1f - Mathf.Clamp01((Stamina - 1) * 0.12f);
         public float CurrentNoiseLevel { get; private set; }
         public bool IsGameOver { get; private set; }
         public GameOverReason LastGameOverReason { get; private set; }
@@ -43,6 +47,7 @@ namespace Dormitory7.Core
         public event Action<float, float> OnTrashChanged;
         public event Action<int, int> OnReprimandsChanged;
         public event Action<int, int> OnAttributesChanged;
+        public event Action<bool> OnGymBuffChanged;
         public event Action<GameOverReason, string> OnGameOver;
 
         private float _exhaustionTimer;
@@ -70,6 +75,7 @@ namespace Dormitory7.Core
             Reprimands = 0;
             Strength = 1;
             Stamina = 1;
+            GymBuffRemaining = 0f;
             CurrentNoiseLevel = 0f;
             _exhaustionTimer = 0f;
             IsGameOver = false;
@@ -83,6 +89,13 @@ namespace Dormitory7.Core
             if (IsGameOver || balanceConfig == null) return;
             if (GameStateManager.Instance != null && GameStateManager.Instance.CurrentState != GameState.Playing)
                 return;
+
+            if (GymBuffRemaining > 0f)
+            {
+                GymBuffRemaining = Mathf.Max(0f, GymBuffRemaining - Time.deltaTime);
+                if (GymBuffRemaining <= 0f)
+                    OnGymBuffChanged?.Invoke(false);
+            }
 
             // Passive energy drain proportional to game hours passing
             float gameHoursPerRealSecond = _dayTime != null
@@ -119,9 +132,15 @@ namespace Dormitory7.Core
         public void ConsumeSprintEnergy(float deltaTime)
         {
             if (balanceConfig == null) return;
-            // Higher Stamina reduces sprint energy drain (up to 40% reduction at level 5)
-            float staminaFactor = 1f - Mathf.Clamp01((Stamina - 1) * 0.1f);
-            ModifyEnergy(-balanceConfig.sprintEnergyDrainPerSecond * staminaFactor * deltaTime);
+            ModifyEnergy(-balanceConfig.sprintEnergyDrainPerSecond * StaminaDrainMultiplier * deltaTime);
+        }
+
+        public void ApplyGymBuff(float durationSeconds)
+        {
+            bool wasActive = HasGymBuff;
+            GymBuffRemaining = Mathf.Max(GymBuffRemaining, Mathf.Max(1f, durationSeconds));
+            if (!wasActive)
+                OnGymBuffChanged?.Invoke(true);
         }
 
         public void ApplySleepRecovery()
@@ -200,6 +219,7 @@ namespace Dormitory7.Core
             OnTrashChanged?.Invoke(Trash, balanceConfig.maxTrash);
             OnReprimandsChanged?.Invoke(Reprimands, balanceConfig.maxReprimands);
             OnAttributesChanged?.Invoke(Strength, Stamina);
+            OnGymBuffChanged?.Invoke(HasGymBuff);
         }
     }
 }

@@ -6,8 +6,24 @@ using UnityEngine;
 
 namespace Dormitory7.UI
 {
+    public struct QteDisplayState
+    {
+        public string Title;
+        public string Instruction;
+        public float ProgressNormalized;     // 0..1 overall progress (repair or reps)
+        public bool ShowTimingBar;
+        public float TimingCursor;           // 0..1 needle position
+        public float SweetSpotMin;           // 0..1 green zone start
+        public float SweetSpotMax;           // 0..1 green zone end
+        public bool ShowBalanceBar;
+        public float BalanceValue;           // -1..+1 (0 is centered safe)
+        public float BalanceSafeHalfWidth;   // e.g., 0.35
+    }
+
     public class HudController : MonoBehaviour
     {
+        public static HudController Instance { get; private set; }
+
         [Header("Core References")]
         [SerializeField] private DormStatsManager statsManager;
         [SerializeField] private DayTimeController dayTimeController;
@@ -24,6 +40,7 @@ namespace Dormitory7.UI
         [SerializeField] private TextMeshProUGUI trashValueText;
         [SerializeField] private UnityEngine.UI.Image[] reprimandStampImages;
         [SerializeField] private TextMeshProUGUI clockText;
+        [SerializeField] private TextMeshProUGUI attributesText;
         [SerializeField] private TextMeshProUGUI stealthBadgeText;
 
         [Header("Center Crosshair & Prompts")]
@@ -32,6 +49,18 @@ namespace Dormitory7.UI
         [SerializeField] private TextMeshProUGUI controlsHintText;
         [SerializeField] private UnityEngine.UI.Image holdProgressBarFill;
         [SerializeField] private GameObject holdProgressContainer;
+
+        [Header("Center QTE Indicator (Repairs / Gym)")]
+        [SerializeField] private GameObject qtePanelRoot;
+        [SerializeField] private TextMeshProUGUI qteTitleText;
+        [SerializeField] private TextMeshProUGUI qteInstructionText;
+        [SerializeField] private UnityEngine.UI.Image qteProgressFill;
+        [SerializeField] private GameObject qteTimingBarRoot;
+        [SerializeField] private RectTransform qteSweetSpotRect;
+        [SerializeField] private RectTransform qteTimingCursorRect;
+        [SerializeField] private GameObject qteBalanceBarRoot;
+        [SerializeField] private RectTransform qteBalanceSafeRect;
+        [SerializeField] private RectTransform qteBalanceCursorRect;
 
         [Header("Bottom 4-Slot Quick Inventory")]
         [SerializeField] private UnityEngine.UI.Image[] slotBackgrounds;
@@ -59,6 +88,7 @@ namespace Dormitory7.UI
         private static readonly Color StampActiveColor = new Color(0.84f, 0.16f, 0.16f, 1f);
 
         private float _toastTimer;
+        private bool _isQteVisible;
 
         public void BindCore(
             DormStatsManager stats,
@@ -84,7 +114,8 @@ namespace Dormitory7.UI
             TextMeshProUGUI trashText,
             UnityEngine.UI.Image[] stamps,
             TextMeshProUGUI clock,
-            TextMeshProUGUI stealthBadge)
+            TextMeshProUGUI stealthBadge,
+            TextMeshProUGUI attrsText = null)
         {
             energyFillImage = energyFill;
             energyValueText = energyText;
@@ -94,6 +125,7 @@ namespace Dormitory7.UI
             reprimandStampImages = stamps;
             clockText = clock;
             stealthBadgeText = stealthBadge;
+            if (attrsText != null) attributesText = attrsText;
         }
 
         public void BindCenter(
@@ -108,6 +140,30 @@ namespace Dormitory7.UI
             controlsHintText = hint;
             holdProgressContainer = holdRoot;
             holdProgressBarFill = holdFill;
+        }
+
+        public void BindQte(
+            GameObject root,
+            TextMeshProUGUI title,
+            TextMeshProUGUI instruction,
+            UnityEngine.UI.Image progressFill,
+            GameObject timingRoot,
+            RectTransform sweetSpot,
+            RectTransform timingCursor,
+            GameObject balanceRoot,
+            RectTransform balanceSafe,
+            RectTransform balanceCursor)
+        {
+            qtePanelRoot = root;
+            qteTitleText = title;
+            qteInstructionText = instruction;
+            qteProgressFill = progressFill;
+            qteTimingBarRoot = timingRoot;
+            qteSweetSpotRect = sweetSpot;
+            qteTimingCursorRect = timingCursor;
+            qteBalanceBarRoot = balanceRoot;
+            qteBalanceSafeRect = balanceSafe;
+            qteBalanceCursorRect = balanceCursor;
         }
 
         public void BindInventory(
@@ -142,12 +198,18 @@ namespace Dormitory7.UI
 
         private void Awake()
         {
+            Instance = this;
             if (statsManager == null) statsManager = FindAnyObjectByType<DormStatsManager>();
             if (dayTimeController == null) dayTimeController = FindAnyObjectByType<DayTimeController>();
             if (quickInventory == null) quickInventory = FindAnyObjectByType<QuickInventory>();
             if (playerInteractor == null) playerInteractor = FindAnyObjectByType<PlayerInteractor>();
             if (playerController == null) playerController = FindAnyObjectByType<FirstPersonController>();
             if (gameStateManager == null) gameStateManager = FindAnyObjectByType<GameStateManager>();
+        }
+
+        private void OnDestroy()
+        {
+            if (Instance == this) Instance = null;
         }
 
         private void OnEnable()
@@ -158,6 +220,8 @@ namespace Dormitory7.UI
                 statsManager.OnRespectChanged += HandleRespectChanged;
                 statsManager.OnTrashChanged += HandleTrashChanged;
                 statsManager.OnReprimandsChanged += HandleReprimandsChanged;
+                statsManager.OnAttributesChanged += HandleAttributesChanged;
+                statsManager.OnGymBuffChanged += HandleGymBuffChanged;
             }
 
             if (dayTimeController != null)
@@ -191,6 +255,8 @@ namespace Dormitory7.UI
                 statsManager.OnRespectChanged -= HandleRespectChanged;
                 statsManager.OnTrashChanged -= HandleTrashChanged;
                 statsManager.OnReprimandsChanged -= HandleReprimandsChanged;
+                statsManager.OnAttributesChanged -= HandleAttributesChanged;
+                statsManager.OnGymBuffChanged -= HandleGymBuffChanged;
             }
 
             if (dayTimeController != null)
@@ -224,6 +290,7 @@ namespace Dormitory7.UI
                 HandleRespectChanged(statsManager.Respect);
                 HandleTrashChanged(statsManager.Trash, statsManager.Config != null ? statsManager.Config.maxTrash : 100f);
                 HandleReprimandsChanged(statsManager.Reprimands, statsManager.Config != null ? statsManager.Config.maxReprimands : 3);
+                RefreshAttributesText();
             }
 
             if (dayTimeController != null)
@@ -233,8 +300,9 @@ namespace Dormitory7.UI
             if (toastBannerRoot != null) toastBannerRoot.SetActive(false);
             if (stateOverlayRoot != null) stateOverlayRoot.SetActive(false);
             if (holdProgressContainer != null) holdProgressContainer.SetActive(false);
+            if (qtePanelRoot != null) qtePanelRoot.SetActive(false);
 
-            ShowToast("Кімната №104 — Гуртожиток №7. Дослідіть поверх і підвал! [WASD] Рух • [E] Дія • [G/ПКМ] Викинути/Кинути");
+            ShowToast("Кімната №104 — Гуртожиток №7. Полюйте на тарганів, готуйте, лагодьте аварії та качайтесь у підвалі!");
         }
 
         private void Update()
@@ -244,6 +312,69 @@ namespace Dormitory7.UI
             UpdateStealthIndicator();
             UpdateCarryCoolingText();
             UpdateToastTimer();
+        }
+
+        public void ShowQte(QteDisplayState state)
+        {
+            if (qtePanelRoot == null) return;
+            _isQteVisible = true;
+            qtePanelRoot.SetActive(true);
+
+            if (qteTitleText != null) qteTitleText.text = state.Title ?? "";
+            if (qteInstructionText != null) qteInstructionText.text = state.Instruction ?? "";
+            if (qteProgressFill != null) qteProgressFill.fillAmount = Mathf.Clamp01(state.ProgressNormalized);
+
+            if (qteTimingBarRoot != null)
+            {
+                qteTimingBarRoot.SetActive(state.ShowTimingBar);
+                if (state.ShowTimingBar)
+                {
+                    if (qteSweetSpotRect != null)
+                    {
+                        qteSweetSpotRect.anchorMin = new Vector2(Mathf.Clamp01(state.SweetSpotMin), 0f);
+                        qteSweetSpotRect.anchorMax = new Vector2(Mathf.Clamp01(state.SweetSpotMax), 1f);
+                        qteSweetSpotRect.offsetMin = Vector2.zero;
+                        qteSweetSpotRect.offsetMax = Vector2.zero;
+                    }
+                    if (qteTimingCursorRect != null)
+                    {
+                        float t = Mathf.Clamp01(state.TimingCursor);
+                        qteTimingCursorRect.anchorMin = new Vector2(t, 0f);
+                        qteTimingCursorRect.anchorMax = new Vector2(t, 1f);
+                        qteTimingCursorRect.anchoredPosition = Vector2.zero;
+                    }
+                }
+            }
+
+            if (qteBalanceBarRoot != null)
+            {
+                qteBalanceBarRoot.SetActive(state.ShowBalanceBar);
+                if (state.ShowBalanceBar)
+                {
+                    float half = Mathf.Clamp(state.BalanceSafeHalfWidth, 0.08f, 0.45f);
+                    if (qteBalanceSafeRect != null)
+                    {
+                        qteBalanceSafeRect.anchorMin = new Vector2(0.5f - half, 0f);
+                        qteBalanceSafeRect.anchorMax = new Vector2(0.5f + half, 1f);
+                        qteBalanceSafeRect.offsetMin = Vector2.zero;
+                        qteBalanceSafeRect.offsetMax = Vector2.zero;
+                    }
+                    if (qteBalanceCursorRect != null)
+                    {
+                        float norm = Mathf.Clamp01(0.5f + state.BalanceValue * 0.5f);
+                        qteBalanceCursorRect.anchorMin = new Vector2(norm, 0f);
+                        qteBalanceCursorRect.anchorMax = new Vector2(norm, 1f);
+                        qteBalanceCursorRect.anchoredPosition = Vector2.zero;
+                    }
+                }
+            }
+        }
+
+        public void HideQte()
+        {
+            _isQteVisible = false;
+            if (qtePanelRoot != null)
+                qtePanelRoot.SetActive(false);
         }
 
         private void UpdateEnergyPulse()
@@ -265,6 +396,12 @@ namespace Dormitory7.UI
         private void UpdateInteractionUI()
         {
             if (playerInteractor == null) return;
+
+            if (_isQteVisible)
+            {
+                if (interactionPromptText != null) interactionPromptText.text = "";
+                return;
+            }
 
             bool hasPrompt = !string.IsNullOrEmpty(playerInteractor.CurrentPrompt);
             if (interactionPromptText != null)
@@ -300,7 +437,9 @@ namespace Dormitory7.UI
                 }
                 else
                 {
-                    string useLabel = active.HasTag(ItemTag.Food) ? "[ЛКМ] Вжити  " : "[ЛКМ] Застосувати  ";
+                    string useLabel = active.HasTag(ItemTag.Food)
+                        ? "[ЛКМ] Вжити  "
+                        : (active.itemId == "dichlorvos" || active.itemId == "mop" ? "[Утрим. ЛКМ] Дія  " : "[ЛКМ] Удар/Дія  ");
                     controlsHintText.text = $"{useLabel}[G] Покласти  [ПКМ] Кинути";
                 }
             }
@@ -354,6 +493,16 @@ namespace Dormitory7.UI
             if (respectValueText != null) respectValueText.text = $"РЕСПЕКТ: {Mathf.RoundToInt(current)}";
         }
 
+        private void HandleAttributesChanged(int strength, int stamina) => RefreshAttributesText();
+        private void HandleGymBuffChanged(bool active) => RefreshAttributesText();
+
+        private void RefreshAttributesText()
+        {
+            if (attributesText == null || statsManager == null) return;
+            string buff = statsManager.HasGymBuff ? "  [БАФ КАВИ]" : "";
+            attributesText.text = $"СИЛА: {statsManager.Strength}/5  •  ВИТР.: {statsManager.Stamina}/5{buff}";
+        }
+
         private void HandleTrashChanged(float current, float max)
         {
             float pct = max > 0f ? Mathf.Clamp01(current / max) : 0f;
@@ -393,10 +542,7 @@ namespace Dormitory7.UI
             ShowToast("22:00 — ВІДБІЙ! Поверніться в кімнату №104 та лягайте спати.");
         }
 
-        private void HandleDayAdvanced(int newDay, string message)
-        {
-            ShowToast(message);
-        }
+        private void HandleDayAdvanced(int newDay, string message) => ShowToast(message);
 
         private void RefreshInventoryUI()
         {
@@ -425,7 +571,7 @@ namespace Dormitory7.UI
             }
         }
 
-        private void ShowToast(string message)
+        public void ShowToast(string message)
         {
             if (toastBannerRoot == null || toastBannerText == null) return;
             toastBannerText.text = message;

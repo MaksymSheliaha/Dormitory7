@@ -60,5 +60,49 @@ namespace Dormitory7.Data
         public float baseThrowForce = 9.5f;
         public float throwUpwardBoost = 2.2f;
         public float hotPanCoolingSeconds = 18f;
+
+        [Header("Track A — Cockroaches & Cleaning")]
+        public float cockroachPatrolSpeed = 1.55f;
+        public float cockroachFleeSpeed = 3.5f;
+        public float cockroachFleePlayerDistance = 3.2f;
+        public float cockroachLightFleeDistance = 4.6f;
+        public float cockroachHealth = 1.0f;
+        public float slipperMeleeRange = 2.3f;
+        public float slipperMeleeDamage = 1.2f;
+        public float fryingPanMeleeRange = 2.4f;
+        public float fryingPanMeleeDamage = 1.8f;
+        public float dichlorvosRange = 3.2f;
+        public float dichlorvosDps = 2.2f;
+        public float messTrashPerMinute = 0.8f;
+        public float cleanHoldSeconds = 1.8f;
+        public float cleanTrashReduction = 5.0f;
+        public float disposeCockroachTrashReduction = 2.5f;
+
+        [Header("Track B — Cooking")]
+        public float cookTimeToFlipSeconds = 7.0f;
+        public float flipWindowSeconds = 8.0f;
+        public float cookTimeAfterFlipSeconds = 6.0f;
+        public float readyBeforeBurnSeconds = 9.0f;
+        public float cookedMealEnergyRestore = 50f;
+        public float mivinaEnergyRestore = 25f;
+        public float burnTrashPerSecond = 1.2f;
+
+        [Header("Track C — Repairs")]
+        public float pipeBurstTrashPerMinute = 2.5f;
+        public float cloggedToiletTrashPerMinute = 2.0f;
+        public float electricalTripTrashPerMinute = 1.8f;
+        public float tempTapePatchSeconds = 55f;
+        public float repairBaseProgressSpeed = 0.28f;
+        public float repairEnergyCost = 8f;
+        public float repairTrashRelief = 7f;
+
+        [Header("Track C — Basement Gym")]
+        public float gymWorkoutEnergyCost = 14f;
+        public int gymRepsPerSet = 4;
+        public float gymSuccessRespect = 6f;
+        public float gymFailEnergyPenalty = 15f;
+        public float gymFailRespectPenalty = 5f;
+        public float gymBuffDurationSeconds = 90f;
+        public float gymBuffZoneBonus = 0.12f;
     }
 }

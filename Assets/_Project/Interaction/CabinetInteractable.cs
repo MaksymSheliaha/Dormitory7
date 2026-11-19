@@ -1,9 +1,11 @@
+using System;
 using UnityEngine;
 
 namespace Dormitory7.Interaction
 {
     public class CabinetInteractable : MonoBehaviour, IInteractable
     {
+        public event Action<CabinetInteractable, bool> OnCabinetToggled;
         public enum MotionMode
         {
             SlideDrawer = 0,
@@ -69,6 +71,7 @@ namespace Dormitory7.Interaction
         public void Interact(PlayerContext context)
         {
             _isOpen = !_isOpen;
+            OnCabinetToggled?.Invoke(this, _isOpen);
         }
     }
 }
