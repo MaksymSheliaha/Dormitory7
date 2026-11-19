@@ -1,4 +1,5 @@
 using System;
+using Dormitory7.Audio;
 using Dormitory7.Core;
 using Dormitory7.Data;
 using Dormitory7.Interaction;
@@ -22,6 +23,7 @@ namespace Dormitory7.Features.Gym
         [SerializeField] private Transform animatedBarTransform;
 
         public static event Action<GymStationType, bool> OnAnyWorkoutCompleted;
+        public static float ActiveExertionPulse { get; private set; }
 
         public GymStationType StationType => stationType;
         public bool IsWorkoutActive { get; private set; }
@@ -210,11 +212,22 @@ namespace Dormitory7.Features.Gym
                 ProcessRepAttempt(inBalance && inTiming);
             }
 
-            // Smooth barbell lift animation
+            // Smooth barbell lift animation & final-reps screen exertion pulse
             if (animatedBarTransform != null)
             {
                 _barLiftVisual = Mathf.MoveTowards(_barLiftVisual, 0f, Time.deltaTime * 2.2f);
                 animatedBarTransform.localPosition = _barRestLocalPos + Vector3.up * (_barLiftVisual * 0.35f);
+            }
+
+            bool isFinalReps = CompletedReps >= Mathf.Max(1, TargetReps - 2);
+            if (isFinalReps)
+            {
+                float progressBoost = Mathf.Clamp01((float)(CompletedReps - (TargetReps - 3)) / 2f);
+                ActiveExertionPulse = Mathf.Clamp01(0.45f + progressBoost * 0.45f + _barLiftVisual * 0.25f);
+            }
+            else
+            {
+                ActiveExertionPulse = Mathf.MoveTowards(ActiveExertionPulse, 0f, Time.deltaTime * 3f);
             }
 
             if (IsWorkoutActive)
@@ -229,12 +242,14 @@ namespace Dormitory7.Features.Gym
             {
                 CompletedReps++;
                 _barLiftVisual = 1f;
+                AudioManager.Instance?.PlayBarbellClang(transform.position);
                 if (CompletedReps >= TargetReps)
                     TriggerWorkoutSuccess();
             }
             else
             {
                 _missCount++;
+                AudioManager.Instance?.PlayBarbellClang(transform.position);
                 BalanceValue += (BalanceValue >= 0f ? 0.25f : -0.25f);
                 if (_missCount >= 3 || Mathf.Abs(BalanceValue) >= 1.0f)
                     TriggerWorkoutFail();
@@ -290,6 +305,7 @@ namespace Dormitory7.Features.Gym
             GameStateManager.Instance?.UnregisterActiveQte(CancelWorkoutFromEsc);
             IsWorkoutActive = false;
             IsBossChallengeActive = false;
+            ActiveExertionPulse = 0f;
             _balanceAxisAction.Disable();
             _pushAction.Disable();
             _cancelAction.Disable();

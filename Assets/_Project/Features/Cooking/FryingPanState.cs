@@ -1,4 +1,5 @@
 using System;
+using Dormitory7.Audio;
 using Dormitory7.Core;
 using Dormitory7.Data;
 using Dormitory7.Interaction;
@@ -43,6 +44,7 @@ namespace Dormitory7.Features.Cooking
         private DormStatsManager _stats;
         private Renderer _foodRenderer;
         private WorldItem _worldItem;
+        private AudioSource _sizzleAudio;
 
         private static readonly Color RawColor = new Color(0.90f, 0.84f, 0.56f, 1f);
         private static readonly Color CookingColor = new Color(0.88f, 0.68f, 0.28f, 1f);
@@ -78,6 +80,39 @@ namespace Dormitory7.Features.Cooking
         private void Start()
         {
             _stats = FindAnyObjectByType<DormStatsManager>();
+            _sizzleAudio = GetComponent<AudioSource>();
+            if (_sizzleAudio == null)
+            {
+                _sizzleAudio = gameObject.AddComponent<AudioSource>();
+                _sizzleAudio.spatialBlend = 1f;
+                _sizzleAudio.rolloffMode = AudioRolloffMode.Logarithmic;
+                _sizzleAudio.minDistance = 0.8f;
+                _sizzleAudio.maxDistance = 10f;
+                _sizzleAudio.loop = true;
+                _sizzleAudio.playOnAwake = false;
+                _sizzleAudio.volume = 0.42f;
+            }
+            if (_sizzleAudio.clip == null && AudioManager.Instance != null)
+                _sizzleAudio.clip = AudioManager.Instance.LoopPanSizzle;
+            UpdateSizzleAudio();
+        }
+
+        private void UpdateSizzleAudio()
+        {
+            if (_sizzleAudio == null) return;
+            if (_sizzleAudio.clip == null && AudioManager.Instance != null)
+                _sizzleAudio.clip = AudioManager.Instance.LoopPanSizzle;
+
+            bool shouldSizzle = IsOnActiveBurner && State != DishState.Empty;
+            if (shouldSizzle && _sizzleAudio.clip != null)
+            {
+                _sizzleAudio.pitch = State == DishState.Burned ? 1.25f : (State == DishState.NeedsFlip ? 1.12f : 1.0f);
+                if (!_sizzleAudio.isPlaying) _sizzleAudio.Play();
+            }
+            else if (!shouldSizzle && _sizzleAudio.isPlaying)
+            {
+                _sizzleAudio.Stop();
+            }
         }
 
         public void SetOnBurner(bool onBurner)
@@ -89,6 +124,7 @@ namespace Dormitory7.Features.Cooking
                 StageTimer = 0f;
             }
             UpdateVisuals();
+            UpdateSizzleAudio();
         }
 
         public bool AddRawIngredients(string dishName = "Картопля")
@@ -99,6 +135,7 @@ namespace Dormitory7.Features.Cooking
             StageTimer = 0f;
             State = IsOnActiveBurner ? DishState.Cooking : DishState.Raw;
             UpdateVisuals();
+            UpdateSizzleAudio();
             return true;
         }
 
@@ -167,6 +204,7 @@ namespace Dormitory7.Features.Cooking
 
             if (State == DishState.Burned)
             {
+                UpdateSizzleAudio();
                 if (_stats != null)
                     _stats.ModifyTrash(balanceConfig.burnTrashPerSecond * deltaTime);
 

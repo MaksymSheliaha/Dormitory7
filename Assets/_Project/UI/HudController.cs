@@ -1,6 +1,9 @@
+using Dormitory7.Audio;
 using Dormitory7.Core;
 using Dormitory7.Data;
+using Dormitory7.Features.Gym;
 using Dormitory7.Features.Quests;
+using Dormitory7.NPC;
 using Dormitory7.Player;
 using TMPro;
 using UnityEngine;
@@ -69,6 +72,13 @@ namespace Dormitory7.UI
         [SerializeField] private GameObject carryBannerRoot;
         [SerializeField] private TextMeshProUGUI carryBannerText;
 
+        [Header("UX Feedback Overlays (Danger / Reprimand Stamp / Gym Pulse)")]
+        [SerializeField] private UnityEngine.UI.Image dangerVignetteImage;
+        [SerializeField] private UnityEngine.UI.Image gymPulseImage;
+        [SerializeField] private GameObject reprimandStampRoot;
+        [SerializeField] private TextMeshProUGUI reprimandStampText;
+        [SerializeField] private CanvasGroup reprimandStampCanvasGroup;
+
         [Header("Toast & State Overlay")]
         [SerializeField] private GameObject gameplayHudGroup;
         [SerializeField] private TextMeshProUGUI phoneHintText;
@@ -94,12 +104,32 @@ namespace Dormitory7.UI
         private bool _isQteVisible;
         private bool _shownWelcomeToast;
         private QuestManager _questManager;
+        private KomendantAI _komendant;
+        private int _lastReprimandCount;
+        private float _stampAnimTimer;
+        private const float StampTotalDuration = 2.6f;
 
         public void BindPhoneHint(GameObject hudGroup, TextMeshProUGUI phoneHint)
         {
             gameplayHudGroup = hudGroup;
             phoneHintText = phoneHint;
         }
+
+        public void BindFeedbackOverlays(
+            UnityEngine.UI.Image dangerVig,
+            UnityEngine.UI.Image gymPulse,
+            GameObject stampRoot,
+            TextMeshProUGUI stampText,
+            CanvasGroup stampGroup)
+        {
+            dangerVignetteImage = dangerVig;
+            gymPulseImage = gymPulse;
+            reprimandStampRoot = stampRoot;
+            reprimandStampText = stampText;
+            reprimandStampCanvasGroup = stampGroup;
+        }
+
+        public bool IsReprimandStampVisible => reprimandStampRoot != null && reprimandStampRoot.activeSelf;
 
         public void BindCore(
             DormStatsManager stats,
@@ -217,6 +247,7 @@ namespace Dormitory7.UI
             if (playerController == null) playerController = FindAnyObjectByType<FirstPersonController>();
             if (gameStateManager == null) gameStateManager = FindAnyObjectByType<GameStateManager>();
             _questManager = FindAnyObjectByType<QuestManager>();
+            _komendant = FindAnyObjectByType<KomendantAI>();
         }
 
         private void OnDestroy()
@@ -320,6 +351,10 @@ namespace Dormitory7.UI
             if (stateOverlayRoot != null) stateOverlayRoot.SetActive(false);
             if (holdProgressContainer != null) holdProgressContainer.SetActive(false);
             if (qtePanelRoot != null) qtePanelRoot.SetActive(false);
+            if (reprimandStampRoot != null) reprimandStampRoot.SetActive(false);
+            if (dangerVignetteImage != null) dangerVignetteImage.color = new Color(0.75f, 0.06f, 0.06f, 0f);
+            if (gymPulseImage != null) gymPulseImage.color = new Color(1.0f, 0.42f, 0.12f, 0f);
+            _lastReprimandCount = statsManager != null ? statsManager.Reprimands : 0;
 
             if (gameStateManager != null)
                 HandleGameStateChanged(gameStateManager.CurrentState, gameStateManager.EndStateMessage);
@@ -341,6 +376,95 @@ namespace Dormitory7.UI
             UpdateStealthIndicator();
             UpdateCarryCoolingText();
             UpdateToastTimer();
+            UpdateDangerAndGymOverlays();
+            UpdateReprimandStampAnim();
+        }
+
+        private void UpdateDangerAndGymOverlays()
+        {
+            // 1. Komendant approach danger vignette pulsing in rhythm with heartbeat
+            if (dangerVignetteImage != null)
+            {
+                float danger = _komendant != null ? _komendant.DangerLevel : 0f;
+                bool isPlaying = gameStateManager == null || gameStateManager.CurrentState == GameState.Playing;
+                if (isPlaying && danger > 0.08f)
+                {
+                    float freq = Mathf.Lerp(2.4f, 6.2f, danger);
+                    float pulse = 0.65f + 0.35f * Mathf.Abs(Mathf.Sin(Time.time * freq));
+                    float alpha = Mathf.Clamp01(danger * 0.68f * pulse);
+                    dangerVignetteImage.color = new Color(0.68f, 0.04f, 0.05f, alpha);
+                }
+                else
+                {
+                    Color c = dangerVignetteImage.color;
+                    if (c.a > 0.001f)
+                        dangerVignetteImage.color = new Color(c.r, c.g, c.b, Mathf.MoveTowards(c.a, 0f, Time.unscaledDeltaTime * 2.5f));
+                }
+            }
+
+            // 2. Gym final-reps screen exertion pulse
+            if (gymPulseImage != null)
+            {
+                float exertion = GymEquipment.ActiveExertionPulse;
+                if (exertion > 0.05f)
+                {
+                    float pulse = 0.55f + 0.45f * Mathf.Abs(Mathf.Sin(Time.time * 7.5f));
+                    float alpha = Mathf.Clamp01(exertion * 0.45f * pulse);
+                    gymPulseImage.color = new Color(0.98f, 0.38f, 0.10f, alpha);
+                }
+                else
+                {
+                    Color c = gymPulseImage.color;
+                    if (c.a > 0.001f)
+                        gymPulseImage.color = new Color(c.r, c.g, c.b, Mathf.MoveTowards(c.a, 0f, Time.unscaledDeltaTime * 3.0f));
+                }
+            }
+        }
+
+        public void TriggerReprimandStamp(int currentCount, int maxCount)
+        {
+            AudioManager.Instance?.PlayReprimandStamp();
+            if (reprimandStampRoot == null) return;
+
+            reprimandStampRoot.SetActive(true);
+            _stampAnimTimer = StampTotalDuration;
+            if (reprimandStampText != null)
+                reprimandStampText.text = $"ДОГАНА\n№{currentCount} / {maxCount}";
+            if (reprimandStampCanvasGroup != null)
+                reprimandStampCanvasGroup.alpha = 1f;
+            reprimandStampRoot.transform.localScale = Vector3.one * 2.2f;
+        }
+
+        private void UpdateReprimandStampAnim()
+        {
+            if (_stampAnimTimer <= 0f || reprimandStampRoot == null || !reprimandStampRoot.activeSelf)
+                return;
+
+            _stampAnimTimer -= Time.unscaledDeltaTime;
+            float elapsed = StampTotalDuration - _stampAnimTimer;
+
+            // Punch slam from 2.2x -> 1.0x in first 0.18s
+            if (elapsed < 0.18f)
+            {
+                float t = elapsed / 0.18f;
+                float scale = Mathf.Lerp(2.2f, 1.0f, t * t);
+                reprimandStampRoot.transform.localScale = Vector3.one * scale;
+            }
+            else
+            {
+                reprimandStampRoot.transform.localScale = Vector3.one;
+            }
+
+            // Fade out cleanly in final 0.55s
+            if (reprimandStampCanvasGroup != null)
+            {
+                reprimandStampCanvasGroup.alpha = _stampAnimTimer < 0.55f
+                    ? Mathf.Clamp01(_stampAnimTimer / 0.55f)
+                    : 1f;
+            }
+
+            if (_stampAnimTimer <= 0f)
+                reprimandStampRoot.SetActive(false);
         }
 
         public void ShowQte(QteDisplayState state)
@@ -541,12 +665,18 @@ namespace Dormitory7.UI
 
         private void HandleReprimandsChanged(int count, int max)
         {
-            if (reprimandStampImages == null) return;
-            for (int i = 0; i < reprimandStampImages.Length; i++)
+            if (reprimandStampImages != null)
             {
-                if (reprimandStampImages[i] != null)
-                    reprimandStampImages[i].color = i < count ? StampActiveColor : StampInactiveColor;
+                for (int i = 0; i < reprimandStampImages.Length; i++)
+                {
+                    if (reprimandStampImages[i] != null)
+                        reprimandStampImages[i].color = i < count ? StampActiveColor : StampInactiveColor;
+                }
             }
+
+            if (count > _lastReprimandCount)
+                TriggerReprimandStamp(count, max);
+            _lastReprimandCount = count;
         }
 
         private void HandleTimeChanged(int day, float hour, string formatted)

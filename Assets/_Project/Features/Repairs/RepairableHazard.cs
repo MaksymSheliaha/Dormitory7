@@ -1,4 +1,5 @@
 using System;
+using Dormitory7.Audio;
 using Dormitory7.Core;
 using Dormitory7.Data;
 using Dormitory7.Interaction;
@@ -49,6 +50,8 @@ namespace Dormitory7.Features.Repairs
         private float _qteCursor;
         private float _qteDir = 1f;
         private float[] _originalLightIntensities;
+        private AudioSource _hazardLoopAudio;
+        private float _holdSfxCooldown;
 
         private InputAction _qteHitAction;
         private InputAction _qteCancelAction;
@@ -99,6 +102,50 @@ namespace Dormitory7.Features.Repairs
                 TriggerBreakdown(silent: true);
             else
                 SetState(HazardState.Working);
+
+            EnsureHazardAudioSource();
+            UpdateHazardLoopAudio();
+        }
+
+        private void EnsureHazardAudioSource()
+        {
+            if (_hazardLoopAudio != null) return;
+            _hazardLoopAudio = GetComponent<AudioSource>();
+            if (_hazardLoopAudio == null)
+            {
+                _hazardLoopAudio = gameObject.AddComponent<AudioSource>();
+                _hazardLoopAudio.spatialBlend = 1f;
+                _hazardLoopAudio.rolloffMode = AudioRolloffMode.Logarithmic;
+                _hazardLoopAudio.minDistance = 1.4f;
+                _hazardLoopAudio.maxDistance = 14f;
+                _hazardLoopAudio.loop = true;
+                _hazardLoopAudio.playOnAwake = false;
+                _hazardLoopAudio.volume = 0.45f;
+            }
+            if (_hazardLoopAudio.clip == null && AudioManager.Instance != null)
+            {
+                _hazardLoopAudio.clip = hazardType switch
+                {
+                    HazardType.PipeBurst => AudioManager.Instance.LoopPipeWaterJet,
+                    HazardType.ElectricalPanelTrip => AudioManager.Instance.LoopElectricBuzz,
+                    _ => AudioManager.Instance.AmbWaterDrip
+                };
+            }
+        }
+
+        private void UpdateHazardLoopAudio()
+        {
+            EnsureHazardAudioSource();
+            if (_hazardLoopAudio == null) return;
+            bool shouldPlay = State == HazardState.Broken || State == HazardState.Repairing;
+            if (shouldPlay && _hazardLoopAudio.clip != null)
+            {
+                if (!_hazardLoopAudio.isPlaying) _hazardLoopAudio.Play();
+            }
+            else if (!shouldPlay && _hazardLoopAudio.isPlaying)
+            {
+                _hazardLoopAudio.Stop();
+            }
         }
 
         private void Update()
@@ -159,6 +206,7 @@ namespace Dormitory7.Features.Repairs
                 tempTapeVisual.SetActive(newState == HazardState.TemporarilyPatched);
 
             UpdateAffectedLights(dimmed: showBroken && hazardType == HazardType.ElectricalPanelTrip);
+            UpdateHazardLoopAudio();
             OnHazardStateChanged?.Invoke(this, newState);
         }
 
@@ -299,6 +347,13 @@ namespace Dormitory7.Features.Repairs
                 // Holding LMB/Space also steadily turns the wrench / winds tape (scaled by Strength!)
                 float rate = (balanceConfig != null ? balanceConfig.repairBaseProgressSpeed : 0.28f) * strengthMult;
                 AdvanceRepairProgress(rate * Time.deltaTime);
+                _holdSfxCooldown -= Time.deltaTime;
+                if (_holdSfxCooldown <= 0f)
+                {
+                    _holdSfxCooldown = 0.55f;
+                    if (_isTemporaryTapeRepair) AudioManager.Instance?.PlayTapeWind(transform.position);
+                    else AudioManager.Instance?.PlayWrenchRepair(transform.position);
+                }
             }
 
             if (State == HazardState.Repairing)
@@ -308,6 +363,8 @@ namespace Dormitory7.Features.Repairs
         public void ApplyQteHit(bool inSweetSpot)
         {
             if (State != HazardState.Repairing) return;
+            if (_isTemporaryTapeRepair) AudioManager.Instance?.PlayTapeWind(transform.position);
+            else AudioManager.Instance?.PlayWrenchRepair(transform.position);
             float strengthMult = _stats != null ? _stats.StrengthSpeedMultiplier : 1f;
             float gain = (inSweetSpot ? 0.34f : 0.10f) * strengthMult;
             AdvanceRepairProgress(gain);

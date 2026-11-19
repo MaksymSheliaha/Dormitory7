@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Dormitory7.Audio;
 using Dormitory7.Core;
 using Dormitory7.Data;
 using Dormitory7.Features.Cooking;
@@ -73,6 +74,8 @@ namespace Dormitory7.NPC
         private int _routeIndex = -1;
         private float _routeWaitTimer;
         private bool _waitingAtRoutePoint;
+        private float _footstepDistanceAccum;
+        private int _stepCounter;
 
         private static readonly Color PatrolColor = new Color(0.95f, 0.78f, 0.30f, 1f);
         private static readonly Color InvestigateColor = new Color(1.0f, 0.55f, 0.16f, 1f);
@@ -265,6 +268,7 @@ namespace Dormitory7.NPC
                 _postBribeGraceTimer = Mathf.Max(0f, _postBribeGraceTimer - Time.deltaTime);
 
             UpdateDangerLevel();
+            UpdateFootstepAndKeysAudio();
 
             if (State == KomendantState.Waiting)
             {
@@ -290,6 +294,24 @@ namespace Dormitory7.NPC
                 UpdateInvestigation();
             else if (State == KomendantState.Chasing)
                 UpdateChasing();
+        }
+
+        private void UpdateFootstepAndKeysAudio()
+        {
+            if (State == KomendantState.Waiting || navAgent == null) return;
+            float speed = navAgent.velocity.magnitude;
+            if (speed < 0.25f) return;
+
+            float stride = State == KomendantState.Chasing ? 0.78f : 0.96f;
+            _footstepDistanceAccum += speed * Time.deltaTime;
+            if (_footstepDistanceAccum >= stride)
+            {
+                _footstepDistanceAccum -= stride;
+                _stepCounter++;
+                AudioManager.Instance?.PlayKomendantStep(transform.position);
+                if (_stepCounter % 2 == 0)
+                    AudioManager.Instance?.PlayKomendantKeys(transform.position + Vector3.up * 0.9f);
+            }
         }
 
         private void UpdatePerception()

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Dormitory7.Audio;
 using Dormitory7.Core;
 using Dormitory7.Data;
 using Dormitory7.Features.Cockroaches;
@@ -327,6 +328,7 @@ namespace Dormitory7.Features.Quests
                 ? $" (+{Mathf.RoundToInt(qp.Definition.respectReward)} Респекту)"
                 : "";
             HudController.Instance?.ShowToast($"ЗАДАЧУ ВИКОНАНО: {qp.Definition.title}{rewardTag}");
+            AudioManager.Instance?.PlayQuestChime();
             AddChatMessage("Смартфон • Задачі", $"Виконано: {qp.Definition.title}{rewardTag}", isAlert: false);
         }
 

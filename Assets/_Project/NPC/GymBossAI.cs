@@ -1,4 +1,5 @@
 using System;
+using Dormitory7.Audio;
 using Dormitory7.Core;
 using Dormitory7.Data;
 using Dormitory7.Features.Gym;
@@ -361,6 +362,7 @@ namespace Dormitory7.NPC
                 stats?.ModifyRespect(gain);
                 SetMood(GymBossMood.Pleased);
                 _handshakeAnimTimer = 0.85f;
+                AudioManager.Instance?.PlayBossHandshake(transform.position + Vector3.up * 1.3f);
                 OnPlayerGreeted?.Invoke(morningBonus, gain);
 
                 string msg = morningBonus

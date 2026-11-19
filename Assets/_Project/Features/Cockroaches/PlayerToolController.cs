@@ -1,4 +1,5 @@
 using System;
+using Dormitory7.Audio;
 using Dormitory7.Core;
 using Dormitory7.Data;
 using Dormitory7.Interaction;
@@ -19,6 +20,7 @@ namespace Dormitory7.Features.Cockroaches
         public static event Action<WorldItem, Vector3, Collider> OnPlayerMeleeStrike;
 
         public bool IsSpraying { get; private set; }
+        private float _sprayAudioCooldown;
 
         public void Configure(BalanceConfig config, QuickInventory inv, DormStatsManager stats, Transform cam, GameObject sprayVisual)
         {
@@ -68,15 +70,19 @@ namespace Dormitory7.Features.Cockroaches
 
             if (id == "slipper")
             {
+                AudioManager.Instance?.PlaySlipperSlap(cameraTransform != null ? cameraTransform.position + cameraTransform.forward * 1.1f : transform.position);
                 PerformMeleeStrike(item, balanceConfig.slipperMeleeRange, balanceConfig.slipperMeleeDamage, "Шльоп! Таргана прибито капцем!");
             }
             else if (id == "pan_cold" || id == "pan_hot")
             {
+                AudioManager.Instance?.PlayPanClang(cameraTransform != null ? cameraTransform.position + cameraTransform.forward * 1.1f : transform.position);
                 PerformMeleeStrike(item, balanceConfig.fryingPanMeleeRange, balanceConfig.fryingPanMeleeDamage, "БАМ! Удар сковорідкою!");
             }
             else if (id == "dichlorvos")
             {
                 SetSprayVisual(true);
+                AudioManager.Instance?.PlayDichlorvosBurst(cameraTransform != null ? cameraTransform.position + cameraTransform.forward * 0.8f : transform.position);
+                _sprayAudioCooldown = 0.42f;
             }
         }
 
@@ -88,6 +94,12 @@ namespace Dormitory7.Features.Cockroaches
             if (id == "dichlorvos")
             {
                 SetSprayVisual(true);
+                _sprayAudioCooldown -= deltaTime;
+                if (_sprayAudioCooldown <= 0f)
+                {
+                    _sprayAudioCooldown = 0.42f;
+                    AudioManager.Instance?.PlayDichlorvosBurst(cameraTransform != null ? cameraTransform.position + cameraTransform.forward * 0.8f : transform.position);
+                }
                 PerformDichlorvosSpray(deltaTime);
             }
             else if (id == "mop")

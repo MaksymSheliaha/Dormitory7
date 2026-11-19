@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Dormitory7.Audio;
 using Dormitory7.Core;
 using Dormitory7.Data;
 using Dormitory7.Interaction;
@@ -27,6 +28,8 @@ namespace Dormitory7.Features.Cockroaches
         [SerializeField] private Transform antennaLeft;
         [SerializeField] private Transform antennaRight;
         [SerializeField] private GameObject greenSplatVisual;
+        [SerializeField] private ParticleSystem splatParticles;
+        [SerializeField] private AudioSource scurryAudioSource;
 
         public CockroachState State { get; private set; } = CockroachState.Patrolling;
         public bool IsAlive => State != CockroachState.Dead;
@@ -68,6 +71,10 @@ namespace Dormitory7.Features.Cockroaches
 
             if (greenSplatVisual != null)
                 greenSplatVisual.SetActive(false);
+            if (scurryAudioSource == null)
+                scurryAudioSource = GetComponent<AudioSource>();
+            if (splatParticles == null)
+                splatParticles = GetComponentInChildren<ParticleSystem>(true);
         }
 
         private void OnEnable()
@@ -95,6 +102,22 @@ namespace Dormitory7.Features.Cockroaches
                 for (int i = 0; i < _cachedLights.Length; i++)
                     _lightWasOn[i] = _cachedLights[i] != null && _cachedLights[i].enabled && _cachedLights[i].gameObject.activeInHierarchy;
             }
+
+            if (scurryAudioSource == null)
+            {
+                scurryAudioSource = gameObject.AddComponent<AudioSource>();
+                scurryAudioSource.spatialBlend = 1f;
+                scurryAudioSource.rolloffMode = AudioRolloffMode.Logarithmic;
+                scurryAudioSource.minDistance = 0.5f;
+                scurryAudioSource.maxDistance = 6.5f;
+                scurryAudioSource.loop = true;
+                scurryAudioSource.playOnAwake = false;
+                scurryAudioSource.volume = 0.30f;
+            }
+            if (scurryAudioSource.clip == null && AudioManager.Instance != null)
+                scurryAudioSource.clip = AudioManager.Instance.LoopRoachScurry;
+            if (scurryAudioSource.clip != null && IsAlive && !scurryAudioSource.isPlaying)
+                scurryAudioSource.Play();
         }
 
         private void Update()
@@ -117,6 +140,9 @@ namespace Dormitory7.Features.Cockroaches
                 UpdatePatrol();
             else if (State == CockroachState.Fleeing)
                 UpdateFlee();
+
+            if (scurryAudioSource != null && scurryAudioSource.isPlaying)
+                scurryAudioSource.pitch = State == CockroachState.Fleeing ? 1.45f : 0.95f;
         }
 
         private void EvaluateThreats()
@@ -268,6 +294,13 @@ namespace Dormitory7.Features.Cockroaches
             }
             if (greenSplatVisual != null)
                 greenSplatVisual.SetActive(true);
+            if (scurryAudioSource != null && scurryAudioSource.isPlaying)
+                scurryAudioSource.Stop();
+            if (splatParticles != null)
+            {
+                splatParticles.gameObject.SetActive(true);
+                splatParticles.Play();
+            }
             OnAnyCockroachKilled?.Invoke(this);
         }
 

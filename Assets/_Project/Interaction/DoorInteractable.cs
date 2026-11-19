@@ -1,3 +1,4 @@
+using Dormitory7.Audio;
 using UnityEngine;
 
 namespace Dormitory7.Interaction
@@ -66,6 +67,7 @@ namespace Dormitory7.Interaction
             {
                 _isOpen = true;
                 _openedByNpc = true;
+                AudioManager.Instance?.PlayDoorCreak(transform.position);
             }
             if (_openedByNpc)
                 _npcAutoCloseTimer = Mathf.Max(_npcAutoCloseTimer, autoCloseDelaySeconds);
@@ -93,6 +95,7 @@ namespace Dormitory7.Interaction
             _isOpen = !_isOpen;
             _openedByNpc = false;
             _npcAutoCloseTimer = 0f;
+            AudioManager.Instance?.PlayDoorCreak(transform.position);
         }
     }
 }
