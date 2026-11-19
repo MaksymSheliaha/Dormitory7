@@ -204,33 +204,36 @@ namespace Dormitory7.Audio
             bool isPlaying = GameStateManager.Instance == null || GameStateManager.Instance.CurrentState == GameState.Playing;
             float menuDuck = isPlaying ? 1f : 0.42f;
 
-            // Priority 1: Komendant Chase / Investigation OR Hazard Cascade (>= 2 broken hazards)
-            bool komendantHot = _komendant != null &&
-                (_komendant.State == KomendantState.Chasing ||
-                 _komendant.State == KomendantState.Investigating ||
-                 _komendant.State == KomendantState.BribeWindow);
-            bool hazardCascade = _hazardDirector != null && _hazardDirector.CountBrokenHazards() >= 2;
-
-            // Priority 2: Player inside Basement Gym (y < -1.8, x > 1.0, z < -10.5)
+            // Player inside Basement Gym (x: +0.5..+14.5, y < -1.5, z < -10.2)
             bool inBasementGym = false;
             if (_playerTransform != null)
             {
                 Vector3 p = _playerTransform.position;
-                inBasementGym = p.y < -1.8f && p.x > 1.0f && p.z < -10.5f;
+                inBasementGym = p.y < -1.5f && p.x > 0.5f && p.z < -10.2f;
             }
 
-            if (komendantHot || hazardCascade)
+            bool komendantChase = _komendant != null &&
+                (_komendant.State == KomendantState.Chasing ||
+                 _komendant.State == KomendantState.BribeWindow);
+            bool komendantAlert = komendantChase ||
+                (_komendant != null && _komendant.State == KomendantState.Investigating);
+            bool hazardCascade = _hazardDirector != null && _hazardDirector.CountBrokenHazards() >= 2;
+
+            // Priority: Direct Komendant chase -> Basement Gym Phonk -> Investigation or >=2 Hazard Cascade -> Corridor Eerie
+            if (komendantChase)
                 ActiveMusicZone = MusicZone.ChaseOrHazardTension;
             else if (inBasementGym)
                 ActiveMusicZone = MusicZone.BasementGymPhonk;
+            else if (komendantAlert || hazardCascade)
+                ActiveMusicZone = MusicZone.ChaseOrHazardTension;
             else
                 ActiveMusicZone = MusicZone.CorridorEerie;
 
             float targetCorridor = (ActiveMusicZone == MusicZone.CorridorEerie ? musicBaseVolume * 0.85f : 0f) * menuDuck;
-            float targetGym = (ActiveMusicZone == MusicZone.BasementGymPhonk ? musicBaseVolume * 1.15f : 0f) * menuDuck;
-            float targetTension = (ActiveMusicZone == MusicZone.ChaseOrHazardTension ? musicBaseVolume * 1.10f : 0f) * menuDuck;
+            float targetGym = (ActiveMusicZone == MusicZone.BasementGymPhonk ? musicBaseVolume * 1.20f : 0f) * menuDuck;
+            float targetTension = (ActiveMusicZone == MusicZone.ChaseOrHazardTension ? musicBaseVolume * 1.05f : 0f) * menuDuck;
 
-            float fadeRate = Time.unscaledDeltaTime * 0.65f;
+            float fadeRate = Time.unscaledDeltaTime * 1.15f;
             if (_musicCorridorSource != null) _musicCorridorSource.volume = Mathf.MoveTowards(_musicCorridorSource.volume, targetCorridor, fadeRate);
             if (_musicGymSource != null) _musicGymSource.volume = Mathf.MoveTowards(_musicGymSource.volume, targetGym, fadeRate);
             if (_musicTensionSource != null) _musicTensionSource.volume = Mathf.MoveTowards(_musicTensionSource.volume, targetTension, fadeRate);

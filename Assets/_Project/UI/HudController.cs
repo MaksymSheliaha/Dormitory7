@@ -382,17 +382,17 @@ namespace Dormitory7.UI
 
         private void UpdateDangerAndGymOverlays()
         {
-            // 1. Komendant approach danger vignette pulsing in rhythm with heartbeat
+            // 1. Komendant approach danger vignette (subtle, light periphery pulse synced to heartbeat)
             if (dangerVignetteImage != null)
             {
                 float danger = _komendant != null ? _komendant.DangerLevel : 0f;
                 bool isPlaying = gameStateManager == null || gameStateManager.CurrentState == GameState.Playing;
-                if (isPlaying && danger > 0.08f)
+                if (isPlaying && danger > 0.10f)
                 {
-                    float freq = Mathf.Lerp(2.4f, 6.2f, danger);
-                    float pulse = 0.65f + 0.35f * Mathf.Abs(Mathf.Sin(Time.time * freq));
-                    float alpha = Mathf.Clamp01(danger * 0.68f * pulse);
-                    dangerVignetteImage.color = new Color(0.68f, 0.04f, 0.05f, alpha);
+                    float freq = Mathf.Lerp(2.2f, 5.4f, danger);
+                    float pulse = 0.72f + 0.28f * Mathf.Abs(Mathf.Sin(Time.time * freq));
+                    float alpha = Mathf.Clamp01(danger * 0.28f * pulse);
+                    dangerVignetteImage.color = new Color(0.72f, 0.08f, 0.08f, alpha);
                 }
                 else
                 {
@@ -402,15 +402,15 @@ namespace Dormitory7.UI
                 }
             }
 
-            // 2. Gym final-reps screen exertion pulse
+            // 2. Gym final-reps screen exertion pulse (subtle warm glow)
             if (gymPulseImage != null)
             {
                 float exertion = GymEquipment.ActiveExertionPulse;
                 if (exertion > 0.05f)
                 {
-                    float pulse = 0.55f + 0.45f * Mathf.Abs(Mathf.Sin(Time.time * 7.5f));
-                    float alpha = Mathf.Clamp01(exertion * 0.45f * pulse);
-                    gymPulseImage.color = new Color(0.98f, 0.38f, 0.10f, alpha);
+                    float pulse = 0.65f + 0.35f * Mathf.Abs(Mathf.Sin(Time.time * 6.5f));
+                    float alpha = Mathf.Clamp01(exertion * 0.22f * pulse);
+                    gymPulseImage.color = new Color(0.96f, 0.44f, 0.16f, alpha);
                 }
                 else
                 {
@@ -659,7 +659,16 @@ namespace Dormitory7.UI
         private void HandleTrashChanged(float current, float max)
         {
             float pct = max > 0f ? Mathf.Clamp01(current / max) : 0f;
-            if (trashFillImage != null) trashFillImage.fillAmount = pct;
+            if (trashFillImage != null)
+            {
+                trashFillImage.fillAmount = pct;
+                // Lighter progressive color: calm olive-yellow -> warm amber -> soft warning red
+                trashFillImage.color = pct < 0.40f
+                    ? new Color(0.62f, 0.72f, 0.36f, 0.88f)
+                    : (pct < 0.70f
+                        ? new Color(0.90f, 0.58f, 0.22f, 0.90f)
+                        : new Color(0.84f, 0.30f, 0.26f, 0.92f));
+            }
             if (trashValueText != null) trashValueText.text = $"ТРЕШ: {Mathf.RoundToInt(current)}%";
         }
 

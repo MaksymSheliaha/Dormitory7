@@ -42,6 +42,7 @@ namespace Dormitory7.Core
     {
         public static GameStateManager Instance { get; private set; }
         public const string MasterVolumePrefKey = "Dorm7_MasterVolume";
+        private static bool _skipMainMenuOnNextLoad;
 
         [SerializeField] private DormStatsManager statsManager;
         [SerializeField] private DayTimeController dayTimeController;
@@ -153,7 +154,9 @@ namespace Dormitory7.Core
 
         private void Start()
         {
-            SetState(startInMainMenu ? GameState.MainMenu : GameState.Playing, "");
+            bool openMenu = startInMainMenu && !_skipMainMenuOnNextLoad;
+            _skipMainMenuOnNextLoad = false;
+            SetState(openMenu ? GameState.MainMenu : GameState.Playing, "");
         }
 
         private void OnPausePerformed(InputAction.CallbackContext ctx)
@@ -223,6 +226,7 @@ namespace Dormitory7.Core
 
         public void ReturnToMainMenu()
         {
+            _skipMainMenuOnNextLoad = false;
             Time.timeScale = 1f;
             SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
         }
@@ -264,6 +268,7 @@ namespace Dormitory7.Core
 
         public void RestartScene()
         {
+            _skipMainMenuOnNextLoad = true;
             Time.timeScale = 1f;
             SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
         }

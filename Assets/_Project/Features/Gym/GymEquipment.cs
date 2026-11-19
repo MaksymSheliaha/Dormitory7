@@ -82,8 +82,16 @@ namespace Dormitory7.Features.Gym
             _cancelAction.AddBinding("<Gamepad>/buttonEast");
         }
 
+        private void OnDisable()
+        {
+            if (IsWorkoutActive)
+                StopWorkoutCleanly();
+            ActiveExertionPulse = 0f;
+        }
+
         private void OnDestroy()
         {
+            ActiveExertionPulse = 0f;
             _balanceAxisAction?.Dispose();
             _pushAction?.Dispose();
             _cancelAction?.Dispose();

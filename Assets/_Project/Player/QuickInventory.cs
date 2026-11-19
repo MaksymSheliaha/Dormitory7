@@ -155,11 +155,21 @@ namespace Dormitory7.Player
             _useAction?.Dispose();
         }
 
+        private float _uiResumeInputGuard;
+
         private void Update()
         {
             if (GameStateManager.Instance != null && GameStateManager.Instance.CurrentState != GameState.Playing)
             {
+                _uiResumeInputGuard = 0.16f;
                 ReleaseUseIfHolding();
+                return;
+            }
+
+            if (_uiResumeInputGuard > 0f)
+            {
+                _uiResumeInputGuard -= Time.unscaledDeltaTime;
+                UpdateHandSwingAnimation();
                 return;
             }
 
