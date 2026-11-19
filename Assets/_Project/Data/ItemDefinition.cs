@@ -56,6 +56,7 @@ namespace Dormitory7.Data
         public bool HasTag(ItemTag tag) => (tags & tag) == tag;
         public bool IsHot => HasTag(ItemTag.HotCookware) && coolsToItem != null;
         public bool IsBossGift => isBossGift || HasTag(ItemTag.BossGift);
+        public bool IsKomendantBribe => HasTag(ItemTag.Bribe) || itemId == "chocolate" || itemId == "coffee";
 
         private void OnValidate()
         {

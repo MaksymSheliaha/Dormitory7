@@ -112,5 +112,18 @@ namespace Dormitory7.Data
         public float gymBossShowerEndHour = 10.5f;
         public float gymBossWashroomEndHour = 12.0f;
         public float gymBossKitchenEndHour = 14.5f;
+
+        [Header("Week 3 — Komendant (Zinaida Petrivna)")]
+        public float komendantPatrolSpeed = 2.6f;
+        public float komendantChaseSpeed = 4.4f;
+        public float komendantVisionRange = 11.5f;
+        public float komendantVisionHalfAngle = 36f;
+        public float komendantDarkRoomVisionMultiplier = 0.42f;
+        public float komendantHearingMaxRadius = 11.0f;
+        public float komendantCatchDistance = 1.65f;
+        public float komendantSuspicionSeconds = 5.5f;
+        public float komendantBribeWindowSeconds = 5.0f;
+        public float komendantBribeTrashRelief = 10f;
+        public int komendantWeeklyBribeLimit = 1;
     }
 }

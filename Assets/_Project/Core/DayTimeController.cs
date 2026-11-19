@@ -106,7 +106,21 @@ namespace Dormitory7.Core
 
         public void SleepAndAdvanceDay()
         {
+            SleepAndAdvanceDay(forcedByKomendant: false, customSummary: null);
+        }
+
+        public void SleepAndAdvanceDay(bool forcedByKomendant, string customSummary)
+        {
             if (IsWeekCompleted || balanceConfig == null) return;
+
+            // GDD 5.6: If sleeping cleanly before 22:00 with Trash <= 50%, curfew inspection is skipped!
+            // If Trash > 50% when going to sleep (and not already reprimanded by Komendant), issue absentee reprimand.
+            if (!forcedByKomendant && statsManager != null && statsManager.Trash > balanceConfig.komendantTrashThreshold)
+            {
+                statsManager.AddReprimand($"Критичний Треш ({Mathf.RoundToInt(statsManager.Trash)}% > 50%) на поверсі");
+                if (statsManager.IsGameOver)
+                    return;
+            }
 
             if (statsManager != null)
                 statsManager.ApplySleepRecovery();
@@ -125,13 +139,25 @@ namespace Dormitory7.Core
             _lastReportedMinute = -1;
 
             BroadcastTimeIfChanged(force: true);
-            string summary = $"День {CurrentDay} — {CurrentDayFullName}. Сон відновив +{Mathf.RoundToInt(balanceConfig.sleepEnergyRestore)}% Енергії.";
+            string summary = !string.IsNullOrEmpty(customSummary)
+                ? customSummary
+                : $"День {CurrentDay} — {CurrentDayFullName}. Сон відновив +{Mathf.RoundToInt(balanceConfig.sleepEnergyRestore)}% Енергії.";
             OnDayAdvanced?.Invoke(CurrentDay, summary);
         }
 
         public void SetHourForTesting(float hour)
         {
             CurrentHour = Mathf.Clamp(hour, 0f, 23.98f);
+            if (!IsCurfewWarningTriggered && balanceConfig != null && CurrentHour >= balanceConfig.curfewWarningHour)
+            {
+                IsCurfewWarningTriggered = true;
+                OnCurfewWarning?.Invoke();
+            }
+            if (!IsCurfewActive && balanceConfig != null && CurrentHour >= balanceConfig.curfewHour)
+            {
+                IsCurfewActive = true;
+                OnCurfewStarted?.Invoke();
+            }
             BroadcastTimeIfChanged(force: true);
         }
 

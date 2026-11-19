@@ -95,3 +95,14 @@ MonoBehaviour:
   gymBossShowerEndHour: 10.5
   gymBossWashroomEndHour: 12
   gymBossKitchenEndHour: 14.5
+  komendantPatrolSpeed: 2.6
+  komendantChaseSpeed: 4.4
+  komendantVisionRange: 11.5
+  komendantVisionHalfAngle: 36
+  komendantDarkRoomVisionMultiplier: 0.42
+  komendantHearingMaxRadius: 11
+  komendantCatchDistance: 1.65
+  komendantSuspicionSeconds: 5.5
+  komendantBribeWindowSeconds: 5
+  komendantBribeTrashRelief: 10
+  komendantWeeklyBribeLimit: 1

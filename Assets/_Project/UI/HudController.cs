@@ -534,12 +534,12 @@ namespace Dormitory7.UI
 
         private void HandleCurfewWarning()
         {
-            ShowToast("21:30 — УВАГА! Зінаїда Петрівна готується до вечірнього обходу о 22:00!");
+            ShowToast("21:30 — Зіна вийшла на полювання! Приберіть поверх і сховайтесь до 22:00!");
         }
 
         private void HandleCurfewStarted()
         {
-            ShowToast("22:00 — ВІДБІЙ! Поверніться в кімнату №104 та лягайте спати.");
+            ShowToast("22:00 — ВІДБІЙ! Комендантша Зінаїда Петрівна почала вечірній обхід!");
         }
 
         private void HandleDayAdvanced(int newDay, string message) => ShowToast(message);
