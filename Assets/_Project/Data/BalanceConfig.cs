@@ -104,5 +104,13 @@ namespace Dormitory7.Data
         public float gymFailRespectPenalty = 5f;
         public float gymBuffDurationSeconds = 90f;
         public float gymBuffZoneBonus = 0.12f;
+
+        [Header("Week 3 — Gym Boss NPC")]
+        public float gymBossGreetRespect = 7f;
+        public float gymBossMorningShowerMultiplier = 2f;
+        public float gymBossIgnoreRespectPenalty = 8f;
+        public float gymBossShowerEndHour = 10.5f;
+        public float gymBossWashroomEndHour = 12.0f;
+        public float gymBossKitchenEndHour = 14.5f;
     }
 }

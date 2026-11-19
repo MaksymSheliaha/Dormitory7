@@ -35,6 +35,9 @@ namespace Dormitory7.Data
         public ItemCarryType carryType = ItemCarryType.SmallInventory;
         public ItemTag tags = ItemTag.None;
 
+        [Header("Gym Boss Gifts")]
+        public bool isBossGift = false;
+
         [Header("Hot Cookware Cooling")]
         [Tooltip("If assigned, a hot two-handed item cools down into this definition after coolingDurationSeconds.")]
         public ItemDefinition coolsToItem;
@@ -52,5 +55,14 @@ namespace Dormitory7.Data
 
         public bool HasTag(ItemTag tag) => (tags & tag) == tag;
         public bool IsHot => HasTag(ItemTag.HotCookware) && coolsToItem != null;
+        public bool IsBossGift => isBossGift || HasTag(ItemTag.BossGift);
+
+        private void OnValidate()
+        {
+            if (isBossGift)
+                tags |= ItemTag.BossGift;
+            else if (HasTag(ItemTag.BossGift))
+                isBossGift = true;
+        }
     }
 }

@@ -89,3 +89,9 @@ MonoBehaviour:
   gymFailRespectPenalty: 5
   gymBuffDurationSeconds: 90
   gymBuffZoneBonus: 0.12
+  gymBossGreetRespect: 7
+  gymBossMorningShowerMultiplier: 2
+  gymBossIgnoreRespectPenalty: 8
+  gymBossShowerEndHour: 10.5
+  gymBossWashroomEndHour: 12
+  gymBossKitchenEndHour: 14.5
