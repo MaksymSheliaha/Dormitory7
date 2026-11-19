@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ca5acb23d65536846986205d7d672ff9, type: 3}
+  m_Name: Item_Slipper
+  m_EditorClassIdentifier: Assembly-CSharp::Dormitory7.Data.ItemDefinition
+  itemId: slipper
+  displayName: "\u041A\u0430\u043F\u0435\u0446\u044C"
+  description: "\u0413\u0440\u043E\u0437\u0430 \u043E\u0431\u0449\u0430\u0436\u043D\u0438\u0445 \u0442\u0430\u0440\u0433\u0430\u043D\u0456\u0432."
+  carryType: 0
+  tags: 8
+  coolsToItem: {fileID: 0}
+  coolingDurationSeconds: 0
+  energyRestore: 0
+  respectGiftBonus: 0
+  throwForceMultiplier: 1.25
+  physicsMass: 0.4
+  tintColor: {r: 0.24, g: 0.44, b: 0.72, a: 1}
+  worldPrefab: {fileID: 0}

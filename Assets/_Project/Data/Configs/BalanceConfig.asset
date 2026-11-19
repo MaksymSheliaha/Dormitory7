@@ -1,0 +1,55 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 59f30f83ac9271f458a7e1805ca0b4de, type: 3}
+  m_Name: BalanceConfig
+  m_EditorClassIdentifier: Assembly-CSharp::Dormitory7.Data.BalanceConfig
+  startingEnergy: 75
+  maxEnergy: 100
+  lowEnergyWarningThreshold: 20
+  gymMinEnergyThreshold: 15
+  sleepEnergyRestore: 25
+  passiveEnergyDrainPerGameHour: 2.2
+  sprintEnergyDrainPerSecond: 6
+  exhaustionGameOverSeconds: 12
+  startingRespect: 10
+  minRespect: 0
+  maxRespect: 100
+  cockroachTrashPerMinute: 0.5
+  komendantTrashThreshold: 50
+  maxTrash: 100
+  maxReprimands: 3
+  dayStartHour: 8
+  curfewWarningHour: 21.5
+  curfewHour: 22
+  realSecondsFromStartToCurfew: 360
+  daysInWeek: 5
+  walkSpeed: 4.2
+  sprintSpeed: 6.8
+  crouchSpeed: 2.2
+  jumpHeight: 1.15
+  gravity: -20
+  standingHeight: 1.8
+  crouchHeight: 1.05
+  standingCameraY: 1.62
+  crouchCameraY: 0.92
+  crouchTransitionSpeed: 10
+  mouseSensitivity: 0.14
+  gamepadLookSpeed: 140
+  idleNoise: 0.02
+  crouchNoise: 0.12
+  walkNoise: 0.45
+  sprintNoise: 1
+  interactDistance: 2.8
+  dropForwardOffset: 0.95
+  baseThrowForce: 9.5
+  throwUpwardBoost: 2.2
+  hotPanCoolingSeconds: 18
