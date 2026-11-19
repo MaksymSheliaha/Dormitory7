@@ -22,10 +22,23 @@ namespace Dormitory7.Core
 
         public GameState CurrentState { get; private set; } = GameState.Playing;
         public string EndStateMessage { get; private set; } = "";
+        public bool IsAnyQteActive => _activeQteCancelHandler != null;
 
         public event Action<GameState, string> OnStateChanged;
 
         private InputAction _pauseAction;
+        private Action _activeQteCancelHandler;
+
+        public void RegisterActiveQte(Action onCancel)
+        {
+            _activeQteCancelHandler = onCancel;
+        }
+
+        public void UnregisterActiveQte(Action onCancel)
+        {
+            if (_activeQteCancelHandler == onCancel)
+                _activeQteCancelHandler = null;
+        }
 
         public void SetReferences(DormStatsManager stats, DayTimeController dayTime)
         {
@@ -89,6 +102,15 @@ namespace Dormitory7.Core
 
         private void OnPausePerformed(InputAction.CallbackContext ctx)
         {
+            // If a Repair or Gym QTE is active, Esc cancels the QTE cleanly instead of pausing!
+            if (_activeQteCancelHandler != null)
+            {
+                Action cancel = _activeQteCancelHandler;
+                _activeQteCancelHandler = null;
+                cancel.Invoke();
+                return;
+            }
+
             if (CurrentState == GameState.Playing)
                 SetState(GameState.Paused, "Пауза");
             else if (CurrentState == GameState.Paused)

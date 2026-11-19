@@ -58,9 +58,9 @@ MonoBehaviour:
   cockroachFleePlayerDistance: 3.2
   cockroachLightFleeDistance: 4.6
   cockroachHealth: 1
-  slipperMeleeRange: 2.3
+  slipperMeleeRange: 2.9
   slipperMeleeDamage: 1.2
-  fryingPanMeleeRange: 2.4
+  fryingPanMeleeRange: 3
   fryingPanMeleeDamage: 1.8
   dichlorvosRange: 3.2
   dichlorvosDps: 2.2

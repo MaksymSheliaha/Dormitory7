@@ -37,6 +37,7 @@ namespace Dormitory7.Features.Cockroaches
         private float _fleeTimer;
         private float _lightCheckTimer;
         private Light[] _cachedLights;
+        private bool[] _lightWasOn;
 
         public void Configure(
             BalanceConfig config,
@@ -85,6 +86,12 @@ namespace Dormitory7.Features.Cockroaches
                 _playerTransform = playerGo.transform;
 
             _cachedLights = FindObjectsByType<Light>();
+            if (_cachedLights != null)
+            {
+                _lightWasOn = new bool[_cachedLights.Length];
+                for (int i = 0; i < _cachedLights.Length; i++)
+                    _lightWasOn[i] = _cachedLights[i] != null && _cachedLights[i].enabled && _cachedLights[i].gameObject.activeInHierarchy;
+            }
         }
 
         private void Update()
@@ -125,19 +132,25 @@ namespace Dormitory7.Features.Cockroaches
             _lightCheckTimer -= Time.deltaTime;
             if (_lightCheckTimer <= 0f)
             {
-                _lightCheckTimer = 0.45f;
-                if (_cachedLights != null)
+                _lightCheckTimer = 0.25f;
+                if (_cachedLights != null && _lightWasOn != null)
                 {
                     float maxDistSqr = balanceConfig.cockroachLightFleeDistance * balanceConfig.cockroachLightFleeDistance;
                     for (int i = 0; i < _cachedLights.Length; i++)
                     {
                         Light l = _cachedLights[i];
-                        if (l == null || !l.enabled || !l.gameObject.activeInHierarchy || l.intensity < 1f) continue;
-                        Vector3 d = transform.position - l.transform.position;
-                        if (Mathf.Abs(d.y) < 3.1f && (d.x * d.x + d.z * d.z) < maxDistSqr)
+                        bool isOnNow = l != null && l.enabled && l.gameObject.activeInHierarchy && l.intensity >= 1f;
+                        bool justTurnedOn = isOnNow && !_lightWasOn[i];
+                        _lightWasOn[i] = isOnNow;
+
+                        if (justTurnedOn)
                         {
-                            StartFleeFrom(l.transform.position);
-                            break;
+                            Vector3 d = transform.position - l.transform.position;
+                            if (Mathf.Abs(d.y) < 3.2f && (d.x * d.x + d.z * d.z) < maxDistSqr * 1.6f)
+                            {
+                                StartFleeFrom(l.transform.position);
+                                break;
+                            }
                         }
                     }
                 }

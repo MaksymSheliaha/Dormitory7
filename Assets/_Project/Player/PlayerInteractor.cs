@@ -69,9 +69,13 @@ namespace Dormitory7.Player
 
         private void Update()
         {
-            if (GameStateManager.Instance != null && GameStateManager.Instance.CurrentState != GameState.Playing)
+            if (GameStateManager.Instance != null &&
+                (GameStateManager.Instance.CurrentState != GameState.Playing || GameStateManager.Instance.IsAnyQteActive))
             {
                 CancelActiveHold(BuildContext());
+                _currentTarget = null;
+                CurrentPrompt = "";
+                CanInteractCurrent = false;
                 return;
             }
 

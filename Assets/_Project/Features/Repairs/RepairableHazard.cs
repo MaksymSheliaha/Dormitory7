@@ -73,8 +73,8 @@ namespace Dormitory7.Features.Repairs
             _qteHitAction.AddBinding("<Gamepad>/buttonSouth");
 
             _qteCancelAction = new InputAction("RepairCancel", InputActionType.Button);
-            _qteCancelAction.AddBinding("<Keyboard>/escape");
-            _qteCancelAction.AddBinding("<Keyboard>/e");
+            _qteCancelAction.AddBinding("<Keyboard>/q");
+            _qteCancelAction.AddBinding("<Gamepad>/buttonEast");
         }
 
         private void OnDestroy()
@@ -266,6 +266,7 @@ namespace Dormitory7.Features.Repairs
             SetState(HazardState.Repairing);
             _activeRepairCtx.Controller?.SetMovementLocked(true);
             _activeRepairCtx.Inventory?.SetInputLocked(true);
+            GameStateManager.Instance?.RegisterActiveQte(CancelRepairQte);
 
             _qteHitAction.Enable();
             _qteCancelAction.Enable();
@@ -350,6 +351,7 @@ namespace Dormitory7.Features.Repairs
 
         private void EndRepairLocks()
         {
+            GameStateManager.Instance?.UnregisterActiveQte(CancelRepairQte);
             _qteHitAction.Disable();
             _qteCancelAction.Disable();
             _activeRepairCtx.Controller?.SetMovementLocked(false);

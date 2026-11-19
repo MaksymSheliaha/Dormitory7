@@ -69,7 +69,8 @@ namespace Dormitory7.Features.Gym
             _pushAction.AddBinding("<Gamepad>/buttonSouth");
 
             _cancelAction = new InputAction("GymCancel", InputActionType.Button);
-            _cancelAction.AddBinding("<Keyboard>/escape");
+            _cancelAction.AddBinding("<Keyboard>/q");
+            _cancelAction.AddBinding("<Gamepad>/buttonEast");
         }
 
         private void OnDestroy()
@@ -135,12 +136,20 @@ namespace Dormitory7.Features.Gym
 
             _ctx.Controller?.SetMovementLocked(true);
             _ctx.Inventory?.SetInputLocked(true);
+            GameStateManager.Instance?.RegisterActiveQte(CancelWorkoutFromEsc);
 
             _balanceAxisAction.Enable();
             _pushAction.Enable();
             _cancelAction.Enable();
 
             PushHudQte();
+        }
+
+        private void CancelWorkoutFromEsc()
+        {
+            if (!IsWorkoutActive) return;
+            StopWorkoutCleanly();
+            HudController.Instance?.ShowToast("Тренування перервано.");
         }
 
         private void Update()
@@ -257,6 +266,7 @@ namespace Dormitory7.Features.Gym
 
         private void StopWorkoutCleanly()
         {
+            GameStateManager.Instance?.UnregisterActiveQte(CancelWorkoutFromEsc);
             IsWorkoutActive = false;
             _balanceAxisAction.Disable();
             _pushAction.Disable();
