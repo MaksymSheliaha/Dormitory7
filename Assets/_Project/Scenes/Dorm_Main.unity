@@ -52547,6 +52547,7 @@ MonoBehaviour:
   twoHandAnchor: {fileID: 656317294}
   holsterRoot: {fileID: 1013319336}
   statsManager: {fileID: 408980332}
+  fallbackUrpItemMaterial: {fileID: 2100000, guid: 8d415c50a7accd34aa6d531fcb113ff2, type: 2}
 --- !u!143 &1301959391
 CharacterController:
   m_ObjectHideFlags: 0
@@ -86854,8 +86855,8 @@ MeshFilter:
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
-  - {fileID: 408980333}
   - {fileID: 1669814136}
+  - {fileID: 408980333}
   - {fileID: 1301959388}
   - {fileID: 851811172}
   - {fileID: 2006424884}

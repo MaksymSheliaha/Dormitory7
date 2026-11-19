@@ -426,13 +426,21 @@ namespace Dormitory7.Features.Quests
             }
             if (!hasTape && emergencyBlueTapeDef != null)
             {
-                var tapeGo = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                GameObject tapeGo = emergencyBlueTapeDef.worldPrefab != null
+                    ? Instantiate(emergencyBlueTapeDef.worldPrefab, new Vector3(-8.60f, 0.78f, 7.10f), Quaternion.identity)
+                    : GameObject.CreatePrimitive(PrimitiveType.Cylinder);
                 tapeGo.name = "EmergencyBlueTape_Room104";
-                tapeGo.transform.position = new Vector3(-8.60f, 0.78f, 7.10f);
-                tapeGo.transform.localScale = new Vector3(0.11f, 0.04f, 0.11f);
-                var rb = tapeGo.AddComponent<Rigidbody>();
-                rb.mass = 0.2f;
-                var wi = tapeGo.AddComponent<WorldItem>();
+                if (emergencyBlueTapeDef.worldPrefab == null)
+                {
+                    tapeGo.transform.position = new Vector3(-8.60f, 0.78f, 7.10f);
+                    tapeGo.transform.localScale = new Vector3(0.11f, 0.04f, 0.11f);
+                }
+                if (tapeGo.GetComponent<Rigidbody>() == null)
+                {
+                    var rb = tapeGo.AddComponent<Rigidbody>();
+                    rb.mass = 0.2f;
+                }
+                var wi = tapeGo.GetComponent<WorldItem>() ?? tapeGo.AddComponent<WorldItem>();
                 wi.Initialize(emergencyBlueTapeDef);
             }
         }

@@ -24,6 +24,8 @@ namespace Dormitory7.Features.Gym
 
         public static event Action<GymStationType, bool> OnAnyWorkoutCompleted;
         public static float ActiveExertionPulse { get; private set; }
+        public static bool IsAnyWorkoutActive => _activeWorkoutInstance != null && _activeWorkoutInstance.IsWorkoutActive;
+        private static GymEquipment _activeWorkoutInstance;
 
         public GymStationType StationType => stationType;
         public bool IsWorkoutActive { get; private set; }
@@ -141,7 +143,9 @@ namespace Dormitory7.Features.Gym
             if (_stats == null) _stats = context.Stats ?? FindAnyObjectByType<DormStatsManager>();
 
             IsWorkoutActive = true;
+            _activeWorkoutInstance = this;
             IsBossChallengeActive = isBossChallenge;
+            ActiveExertionPulse = 0f;
             CompletedReps = 0;
             _missCount = 0;
             BalanceValue = 0f;
@@ -218,6 +222,7 @@ namespace Dormitory7.Features.Gym
                 bool inBalance = Mathf.Abs(BalanceValue) <= _safeHalfWidth * 2f;
                 bool inTiming = _timingCursor >= _sweetMin && _timingCursor <= _sweetMax;
                 ProcessRepAttempt(inBalance && inTiming);
+                if (!IsWorkoutActive) return;
             }
 
             // Smooth barbell lift animation & final-reps screen exertion pulse
@@ -312,6 +317,7 @@ namespace Dormitory7.Features.Gym
         {
             GameStateManager.Instance?.UnregisterActiveQte(CancelWorkoutFromEsc);
             IsWorkoutActive = false;
+            if (_activeWorkoutInstance == this) _activeWorkoutInstance = null;
             IsBossChallengeActive = false;
             ActiveExertionPulse = 0f;
             _balanceAxisAction.Disable();

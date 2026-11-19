@@ -17,6 +17,7 @@ MonoBehaviour:
   description: "\u041F\u0435\u0447\u0435! \u041D\u0435\u0441\u0456\u0442\u044C \u0443 \u0440\u0443\u043A\u0430\u0445, \u0434\u043E\u043A\u0438 \u043D\u0435 \u043E\u0445\u043E\u043B\u043E\u043D\u0435."
   carryType: 1
   tags: 136
+  isBossGift: 0
   coolsToItem: {fileID: 11400000, guid: 1cc4a35eeaa59a54a8a1a2695bbb1dad, type: 2}
   coolingDurationSeconds: 18
   energyRestore: 0
@@ -24,4 +25,4 @@ MonoBehaviour:
   throwForceMultiplier: 0.75
   physicsMass: 1.5
   tintColor: {r: 0.86, g: 0.34, b: 0.14, a: 1}
-  worldPrefab: {fileID: 0}
+  worldPrefab: {fileID: 4171492696744456955, guid: 61c9647f8e806cd4a950ecda73d6d280, type: 3}

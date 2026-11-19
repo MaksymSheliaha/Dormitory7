@@ -17,6 +17,9 @@ namespace Dormitory7.Player
         [SerializeField] private Transform twoHandAnchor;
         [SerializeField] private Transform holsterRoot;
         [SerializeField] private DormStatsManager statsManager;
+        [SerializeField] private Material fallbackUrpItemMaterial;
+
+        public void SetFallbackMaterial(Material mat) => fallbackUrpItemMaterial = mat;
 
         private readonly WorldItem[] _slots = new WorldItem[SlotCount];
         private int _activeSlotIndex;
@@ -355,6 +358,9 @@ namespace Dormitory7.Player
             {
                 go = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 go.transform.localScale = visualScale;
+                var rend = go.GetComponent<Renderer>();
+                if (rend != null && fallbackUrpItemMaterial != null)
+                    rend.sharedMaterial = fallbackUrpItemMaterial;
                 var rb = go.AddComponent<Rigidbody>();
                 rb.mass = Mathf.Max(0.2f, def.physicsMass);
                 go.AddComponent<WorldItem>();

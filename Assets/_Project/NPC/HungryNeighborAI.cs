@@ -490,12 +490,15 @@ namespace Dormitory7.NPC
                     if (!added)
                     {
                         // Drop right in front of player if slots full
-                        var fallback = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                        GameObject fallback = offer.worldPrefab != null
+                            ? Instantiate(offer.worldPrefab)
+                            : GameObject.CreatePrimitive(PrimitiveType.Cube);
                         fallback.name = $"WorldItem_{offer.itemId}_Barter";
                         fallback.transform.position = transform.position + transform.forward * 0.6f + Vector3.up * 0.8f;
-                        fallback.transform.localScale = new Vector3(0.16f, 0.16f, 0.16f);
-                        fallback.AddComponent<Rigidbody>();
-                        var wi = fallback.AddComponent<WorldItem>();
+                        if (offer.worldPrefab == null)
+                            fallback.transform.localScale = new Vector3(0.16f, 0.16f, 0.16f);
+                        if (fallback.GetComponent<Rigidbody>() == null) fallback.AddComponent<Rigidbody>();
+                        var wi = fallback.GetComponent<WorldItem>() ?? fallback.AddComponent<WorldItem>();
                         wi.Initialize(offer);
                     }
 

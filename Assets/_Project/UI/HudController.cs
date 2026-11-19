@@ -402,10 +402,11 @@ namespace Dormitory7.UI
                 }
             }
 
-            // 2. Gym final-reps screen exertion pulse (subtle warm glow)
+            // 2. Gym final-reps screen exertion pulse (ONLY while an active workout is running!)
             if (gymPulseImage != null)
             {
-                float exertion = GymEquipment.ActiveExertionPulse;
+                bool isPlaying = gameStateManager == null || gameStateManager.CurrentState == GameState.Playing;
+                float exertion = (isPlaying && GymEquipment.IsAnyWorkoutActive) ? GymEquipment.ActiveExertionPulse : 0f;
                 if (exertion > 0.05f)
                 {
                     float pulse = 0.65f + 0.35f * Mathf.Abs(Mathf.Sin(Time.time * 6.5f));
@@ -416,7 +417,7 @@ namespace Dormitory7.UI
                 {
                     Color c = gymPulseImage.color;
                     if (c.a > 0.001f)
-                        gymPulseImage.color = new Color(c.r, c.g, c.b, Mathf.MoveTowards(c.a, 0f, Time.unscaledDeltaTime * 3.0f));
+                        gymPulseImage.color = new Color(c.r, c.g, c.b, Mathf.MoveTowards(c.a, 0f, Time.unscaledDeltaTime * 4.5f));
                 }
             }
         }

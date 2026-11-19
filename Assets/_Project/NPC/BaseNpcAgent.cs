@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Dormitory7.Core;
 using Dormitory7.Interaction;
+using Unity.AI.Navigation;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -68,11 +69,34 @@ namespace Dormitory7.NPC
             _cachedDoors = FindObjectsByType<DoorInteractable>();
             SubscribeDayTime(true);
 
-            // Snap to nearest valid NavMesh point if slightly offset at spawn
-            if (navAgent != null && !navAgent.isOnNavMesh &&
-                NavMesh.SamplePosition(transform.position, out NavMeshHit hit, 2.5f, NavMesh.AllAreas))
+            EnsureNavMeshBound();
+        }
+
+        protected void EnsureNavMeshBound()
+        {
+            if (navAgent == null) return;
+
+            // Ensure NavMeshSurface has registered its baked NavMeshData (critical in cold Standalone builds!)
+            if (!NavMesh.SamplePosition(transform.position, out _, 50f, NavMesh.AllAreas))
             {
-                navAgent.Warp(hit.position);
+                var surface = FindAnyObjectByType<NavMeshSurface>();
+                if (surface != null && surface.navMeshData != null)
+                {
+                    surface.AddData();
+                }
+            }
+
+            if (!navAgent.isOnNavMesh)
+            {
+                if (NavMesh.SamplePosition(transform.position, out NavMeshHit hit, 5.0f, NavMesh.AllAreas))
+                {
+                    // Cycle enabled so Unity recreates the internal native NavMeshAgent once NavMesh data is live
+                    navAgent.enabled = false;
+                    transform.position = hit.position;
+                    navAgent.enabled = true;
+                    if (navAgent.isOnNavMesh)
+                        navAgent.Warp(hit.position);
+                }
             }
         }
 

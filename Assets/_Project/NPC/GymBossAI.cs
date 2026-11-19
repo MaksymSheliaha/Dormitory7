@@ -90,8 +90,9 @@ namespace Dormitory7.NPC
             GymEquipment.OnAnyWorkoutCompleted -= HandleWorkoutCompleted;
         }
 
-        private void OnDestroy()
+        protected override void OnDestroy()
         {
+            base.OnDestroy();
             _armPushAction?.Dispose();
             _armCancelAction?.Dispose();
         }
