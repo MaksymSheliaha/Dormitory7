@@ -143,5 +143,16 @@ namespace Dormitory7.Data
         public float fridayKomendantVisionMultiplier = 1.20f;
         public int fridayBossChallengeReps = 6;
         public float fridayBossChallengeRespect = 18f;
+
+        [Header("MoSCoW Should Features (GDD 10.1)")]
+        public float yeastSabotageTrashSpike = 8f;
+        public float friedCockroachEnergyRestore = 10f;
+        public float friedCockroachWitnessRespectPenalty = 5f;
+        public float friedCockroachWitnessRange = 8.5f;
+        public float barterRespectBonus = 2f;
+        public int armWrestleCooldownDays = 2;
+        public float armWrestleWinRespect = 12f;
+        public float armWrestleLoseRespect = 3f;
+        public float armWrestleLoseEnergy = 8f;
     }
 }

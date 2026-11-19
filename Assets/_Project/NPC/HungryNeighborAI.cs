@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using Dormitory7.Audio;
 using Dormitory7.Core;
 using Dormitory7.Data;
 using Dormitory7.Features.Cockroaches;
 using Dormitory7.Features.Cooking;
+using Dormitory7.Features.Quests;
 using Dormitory7.Interaction;
 using Dormitory7.UI;
 using TMPro;
@@ -31,15 +33,25 @@ namespace Dormitory7.NPC
         [SerializeField] private Transform carryAnchor;
         [SerializeField] private TextMeshPro overheadLabel;
         [SerializeField] private GameObject messPrefab;
+        [SerializeField] private ItemDefinition[] barterRewards;
 
         public NeighborState State { get; private set; } = NeighborState.Roaming;
         public string NeighborName => neighborName;
         public bool IsCarryingPan => _stolenPan != null;
         public WorldItem CarriedPan => _stolenPan;
         public int SpawnedMessCount { get; private set; }
+        public int BarterCompletedCount { get; private set; }
+
+        public ItemDefinition CurrentBarterOffer =>
+            barterRewards != null && barterRewards.Length > 0
+                ? barterRewards[_barterIndex % barterRewards.Length]
+                : null;
 
         public event Action<HungryNeighborAI, WorldItem> OnPanStolen;
         public event Action<HungryNeighborAI, WorldItem> OnPanReturned;
+        public event Action<HungryNeighborAI, ItemDefinition> OnBarterCompleted;
+
+        private int _barterIndex;
 
         private Transform _playerTransform;
         private StoveBurner _targetBurner;
@@ -54,6 +66,12 @@ namespace Dormitory7.NPC
         private static readonly Color RoamColor = new Color(0.84f, 0.88f, 0.72f, 1f);
         private static readonly Color ThiefColor = new Color(0.98f, 0.56f, 0.18f, 1f);
         private static readonly Color FleeColor = new Color(0.95f, 0.30f, 0.28f, 1f);
+
+        public void ConfigureBarterRewards(ItemDefinition[] rewards)
+        {
+            barterRewards = rewards;
+            _barterIndex = 0;
+        }
 
         public void Configure(
             BalanceConfig config,
@@ -124,6 +142,8 @@ namespace Dormitory7.NPC
             if (_stolenPan != null)
                 DropStolenPanAtFeet();
             SpawnedMessCount = 0;
+            if (barterRewards != null && barterRewards.Length > 0)
+                _barterIndex = (newDay - 1) % barterRewards.Length;
             WarpToZone(homeZone);
             StartRoaming();
         }
@@ -413,7 +433,15 @@ namespace Dormitory7.NPC
                     : $"[E] Спробувати забрати сковорідку (ви слабші — краще вдарте ЛКМ!)";
             }
 
-            return $"[E] Поговорити: {neighborName}";
+            ItemDefinition offer = CurrentBarterOffer;
+            if (offer != null && context.Inventory != null && context.Inventory.HasItemWithId("dorm_junk"))
+            {
+                return $"[E] Бартер із {neighborName}: Мотлох → «{offer.displayName}»";
+            }
+
+            return offer != null
+                ? $"[E] Поговорити: {neighborName} (обміняє Мотлох на «{offer.displayName}»)"
+                : $"[E] Поговорити: {neighborName}";
         }
 
         public bool CanInteract(PlayerContext context) => State != NeighborState.Fleeing;
@@ -452,7 +480,46 @@ namespace Dormitory7.NPC
                 return;
             }
 
-            HudController.Instance?.ShowToast($"{neighborName}: «Слухай, на кухні часом ніхто картоплю без нагляду не лишив?»");
+            // MoSCoW Should: Simple Barter (Dorm Junk -> Coffee / Chocolate / Blue Tape / Food!)
+            ItemDefinition offer = CurrentBarterOffer;
+            if (offer != null && context.Inventory != null && context.Inventory.HasItemWithId("dorm_junk"))
+            {
+                if (context.Inventory.TryConsumeItemById("dorm_junk"))
+                {
+                    bool added = context.Inventory.TrySpawnAndAddItem(offer, new Vector3(0.16f, 0.16f, 0.16f));
+                    if (!added)
+                    {
+                        // Drop right in front of player if slots full
+                        var fallback = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                        fallback.name = $"WorldItem_{offer.itemId}_Barter";
+                        fallback.transform.position = transform.position + transform.forward * 0.6f + Vector3.up * 0.8f;
+                        fallback.transform.localScale = new Vector3(0.16f, 0.16f, 0.16f);
+                        fallback.AddComponent<Rigidbody>();
+                        var wi = fallback.AddComponent<WorldItem>();
+                        wi.Initialize(offer);
+                    }
+
+                    BarterCompletedCount++;
+                    _barterIndex++;
+                    float bonus = balanceConfig != null ? balanceConfig.barterRespectBonus : 2f;
+                    statsManager?.ModifyRespect(bonus);
+                    AudioManager.Instance?.PlayQuestChime();
+                    OnBarterCompleted?.Invoke(this, offer);
+
+                    HudController.Instance?.ShowToast(
+                        $"БАРТЕР із {neighborName}: Мотлох → «{offer.displayName}»! (+{Mathf.RoundToInt(bonus)} Респекту)");
+                    QuestManager.Instance?.AddChatMessage(
+                        neighborName,
+                        $"Дякую за підгон! Тримай «{offer.displayName}», ще знайдеш мотлох — заходь!",
+                        isAlert: false);
+                }
+                return;
+            }
+
+            string barterHint = offer != null
+                ? $"Принеси якийсь знайдений Мотлох — обміняю на «{offer.displayName}»!"
+                : "Слухай, на кухні часом ніхто картоплю без нагляду не лишив?";
+            HudController.Instance?.ShowToast($"{neighborName}: «{barterHint}»");
         }
 
         private void SetState(NeighborState newState)

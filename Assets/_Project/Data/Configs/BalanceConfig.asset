@@ -120,3 +120,12 @@ MonoBehaviour:
   fridayKomendantVisionMultiplier: 1.2
   fridayBossChallengeReps: 6
   fridayBossChallengeRespect: 18
+  yeastSabotageTrashSpike: 8
+  friedCockroachEnergyRestore: 10
+  friedCockroachWitnessRespectPenalty: 5
+  friedCockroachWitnessRange: 8.5
+  barterRespectBonus: 2
+  armWrestleCooldownDays: 2
+  armWrestleWinRespect: 12
+  armWrestleLoseRespect: 3
+  armWrestleLoseEnergy: 8

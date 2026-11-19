@@ -2,7 +2,9 @@ using System;
 using Dormitory7.Audio;
 using Dormitory7.Core;
 using Dormitory7.Data;
+using Dormitory7.Features.Quests;
 using Dormitory7.Interaction;
+using Dormitory7.NPC;
 using Dormitory7.Player;
 using Dormitory7.UI;
 using UnityEngine;
@@ -40,8 +42,10 @@ namespace Dormitory7.Features.Repairs
         public float RepairProgress { get; private set; }
         public float TempPatchRemaining { get; private set; }
         public bool IsBroken => State == HazardState.Broken || State == HazardState.Repairing;
+        public bool IsYeastFoamSabotaged { get; private set; }
 
         public static event Action<RepairableHazard, bool> OnAnyHazardRepaired;
+        public static event Action<RepairableHazard> OnAnyYeastSabotage;
         public event Action<RepairableHazard, HazardState> OnHazardStateChanged;
 
         private DormStatsManager _stats;
@@ -188,11 +192,74 @@ namespace Dormitory7.Features.Repairs
 
         public void TriggerBreakdown(bool silent = false)
         {
+            IsYeastFoamSabotaged = false;
             RepairProgress = 0f;
             TempPatchRemaining = 0f;
             SetState(HazardState.Broken);
             if (!silent)
                 HudController.Instance?.ShowToast($"АВАРІЯ: {GetHazardDisplayName()}! Рівень Трешу зростає.");
+        }
+
+        public void TriggerYeastFoamSabotage()
+        {
+            if (hazardType != HazardType.CloggedToilet) return;
+
+            IsYeastFoamSabotaged = true;
+            RepairProgress = 0f;
+            TempPatchRemaining = 0f;
+            SetState(HazardState.Broken);
+
+            // Visual foamy swell on OverflowVisual
+            if (brokenEffectVisual != null)
+            {
+                brokenEffectVisual.transform.localScale = new Vector3(1.55f, 2.2f, 1.55f);
+                var rend = brokenEffectVisual.GetComponentInChildren<Renderer>(true);
+                if (rend != null)
+                {
+                    var mpb = new MaterialPropertyBlock();
+                    rend.GetPropertyBlock(mpb);
+                    mpb.SetColor("_BaseColor", new Color(0.96f, 0.94f, 0.84f, 0.92f));
+                    rend.SetPropertyBlock(mpb);
+                }
+            }
+
+            float trashSpike = balanceConfig != null ? balanceConfig.yeastSabotageTrashSpike : 8f;
+            _stats?.ModifyTrash(trashSpike);
+
+            // Divert Komendant Zinaida Petrivna straight to this toilet wing!
+            var komendant = FindAnyObjectByType<KomendantAI>();
+            komendant?.NotifyDisturbance(transform.position, "пінний саботаж дріжджами в туалеті");
+
+            QuestManager.Instance?.AddChatMessage(
+                "ЧАТ ПОВЕРХУ (ПІНА!)",
+                "Хтось кинув пачку дріжджів в унітаз! Піна лізе на підлогу, Зіна біжить туди!",
+                isAlert: true);
+
+            AudioManager.Instance?.PlayWrenchRepair(transform.position);
+            HudController.Instance?.ShowToast(
+                $"САБОТАЖ ДРІЖДЖАМИ! Пінна аварія відволікла Зінаїду Петрівну в це крило (+{Mathf.RoundToInt(trashSpike)}% Трешу)!");
+            OnAnyYeastSabotage?.Invoke(this);
+        }
+
+        private void OnCollisionEnter(Collision collision)
+        {
+            TryConsumeThrownYeast(collision?.collider);
+        }
+
+        private void OnTriggerEnter(Collider other)
+        {
+            TryConsumeThrownYeast(other);
+        }
+
+        private void TryConsumeThrownYeast(Collider col)
+        {
+            if (hazardType != HazardType.CloggedToilet || IsYeastFoamSabotaged || col == null) return;
+            var item = col.GetComponentInParent<WorldItem>();
+            if (item == null || item.IsHeld || item.Definition == null) return;
+            if (item.Definition.itemId != "yeast") return;
+
+            Destroy(item.gameObject);
+            TriggerYeastFoamSabotage();
         }
 
         private void SetState(HazardState newState)
@@ -240,8 +307,16 @@ namespace Dormitory7.Features.Repairs
 
         public string GetPrompt(PlayerContext context)
         {
+            bool holdingYeast = hazardType == HazardType.CloggedToilet &&
+                                context.Inventory != null &&
+                                context.Inventory.HasActiveItemWithId("yeast");
+
             if (State == HazardState.Working || State == HazardState.Repaired)
+            {
+                if (holdingYeast)
+                    return "[E] Закинути Дріжджі в унітаз (пінний саботаж: відволікає Зіну, +Треш!)";
                 return $"{GetHazardDisplayName()} — справно";
+            }
 
             if (State == HazardState.TemporarilyPatched)
             {
@@ -281,8 +356,15 @@ namespace Dormitory7.Features.Repairs
 
         public bool CanInteract(PlayerContext context)
         {
-            if (State == HazardState.Repairing || State == HazardState.Working || State == HazardState.Repaired)
+            if (State == HazardState.Repairing)
                 return false;
+
+            if (State == HazardState.Working || State == HazardState.Repaired)
+            {
+                return hazardType == HazardType.CloggedToilet &&
+                       context.Inventory != null &&
+                       context.Inventory.HasActiveItemWithId("yeast");
+            }
 
             if (State == HazardState.TemporarilyPatched)
                 return hazardType == HazardType.PipeBurst && HasTool(context, "wrench");
@@ -299,6 +381,16 @@ namespace Dormitory7.Features.Repairs
         public void Interact(PlayerContext context)
         {
             if (!CanInteract(context)) return;
+
+            if ((State == HazardState.Working || State == HazardState.Repaired) &&
+                hazardType == HazardType.CloggedToilet &&
+                context.Inventory != null &&
+                context.Inventory.HasActiveItemWithId("yeast"))
+            {
+                if (context.Inventory.TryConsumeActiveItem())
+                    TriggerYeastFoamSabotage();
+                return;
+            }
 
             bool useTempTape = hazardType == HazardType.PipeBurst && !HasTool(context, "wrench") && HasTool(context, "blue_tape");
             BeginRepairQte(context, useTempTape);
@@ -396,6 +488,9 @@ namespace Dormitory7.Features.Repairs
             }
             else
             {
+                IsYeastFoamSabotaged = false;
+                if (brokenEffectVisual != null)
+                    brokenEffectVisual.transform.localScale = Vector3.one;
                 SetState(HazardState.Repaired);
                 OnAnyHazardRepaired?.Invoke(this, true);
                 HudController.Instance?.ShowToast($"{GetHazardDisplayName()} — ВІДРЕМОНТОВАНО надовго! (-Треш)");

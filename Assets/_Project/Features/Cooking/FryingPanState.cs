@@ -33,6 +33,7 @@ namespace Dormitory7.Features.Cooking
         public bool HasBeenFlipped { get; private set; }
         public float StageTimer { get; private set; }
         public string CurrentDishName { get; private set; } = "Картопля";
+        public bool IsCockroachDish { get; private set; }
         public string OwnerNpcName { get; set; } = "";
 
         public bool HasEdibleFood =>
@@ -127,10 +128,11 @@ namespace Dormitory7.Features.Cooking
             UpdateSizzleAudio();
         }
 
-        public bool AddRawIngredients(string dishName = "Картопля")
+        public bool AddRawIngredients(string dishName = "Картопля", bool isCockroachDish = false)
         {
             if (State != DishState.Empty) return false;
             CurrentDishName = dishName;
+            IsCockroachDish = isCockroachDish;
             HasBeenFlipped = false;
             StageTimer = 0f;
             State = IsOnActiveBurner ? DishState.Cooking : DishState.Raw;
@@ -153,20 +155,26 @@ namespace Dormitory7.Features.Cooking
         public float EatReadyDish()
         {
             if (State != DishState.Ready) return 0f;
-            float restore = balanceConfig != null ? balanceConfig.cookedMealEnergyRestore : 50f;
+            float restore = IsCockroachDish
+                ? (balanceConfig != null ? balanceConfig.friedCockroachEnergyRestore : 10f)
+                : (balanceConfig != null ? balanceConfig.cookedMealEnergyRestore : 50f);
             State = DishState.Empty;
+            IsCockroachDish = false;
             HasBeenFlipped = false;
             StageTimer = 0f;
             UpdateVisuals();
+            UpdateSizzleAudio();
             return restore;
         }
 
         public void ClearDish()
         {
             State = DishState.Empty;
+            IsCockroachDish = false;
             HasBeenFlipped = false;
             StageTimer = 0f;
             UpdateVisuals();
+            UpdateSizzleAudio();
         }
 
         public void HeatUpPanForPickup()
