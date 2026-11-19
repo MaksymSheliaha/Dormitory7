@@ -29,6 +29,13 @@ namespace Dormitory7.Features.Cooking
         public bool HasBeenFlipped { get; private set; }
         public float StageTimer { get; private set; }
         public string CurrentDishName { get; private set; } = "Картопля";
+        public string OwnerNpcName { get; set; } = "";
+
+        public bool HasEdibleFood =>
+            State == DishState.Raw ||
+            State == DishState.Cooking ||
+            State == DishState.NeedsFlip ||
+            State == DishState.Ready;
 
         private DormStatsManager _stats;
         private Renderer _foodRenderer;

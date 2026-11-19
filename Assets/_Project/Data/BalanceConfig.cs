@@ -125,5 +125,15 @@ namespace Dormitory7.Data
         public float komendantBribeWindowSeconds = 5.0f;
         public float komendantBribeTrashRelief = 10f;
         public int komendantWeeklyBribeLimit = 1;
+
+        [Header("Week 3 — Hungry Neighbors")]
+        public float neighborWalkSpeed = 2.4f;
+        public float neighborFleeSpeed = 4.5f;
+        public float neighborUnattendedPlayerDist = 7.5f;
+        public int neighborIntimidateMinStrength = 2;
+        public float neighborIntimidateMinRespect = 25f;
+        public float neighborTheftRespectPenalty = 6f;
+        public float neighborReclaimRespectBonus = 4f;
+        public float neighborMessCooldownSeconds = 55f;
     }
 }

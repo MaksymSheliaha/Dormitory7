@@ -106,3 +106,11 @@ MonoBehaviour:
   komendantBribeWindowSeconds: 5
   komendantBribeTrashRelief: 10
   komendantWeeklyBribeLimit: 1
+  neighborWalkSpeed: 2.4
+  neighborFleeSpeed: 4.5
+  neighborUnattendedPlayerDist: 7.5
+  neighborIntimidateMinStrength: 2
+  neighborIntimidateMinRespect: 25
+  neighborTheftRespectPenalty: 6
+  neighborReclaimRespectBonus: 4
+  neighborMessCooldownSeconds: 55

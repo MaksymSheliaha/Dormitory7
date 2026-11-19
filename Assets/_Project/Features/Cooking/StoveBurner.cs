@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using Dormitory7.Data;
 using Dormitory7.Interaction;
 using Dormitory7.UI;
@@ -7,6 +9,8 @@ namespace Dormitory7.Features.Cooking
 {
     public class StoveBurner : MonoBehaviour, IInteractable
     {
+        public static readonly List<StoveBurner> AllBurners = new List<StoveBurner>();
+
         [SerializeField] private Transform panAnchor;
         [SerializeField] private GameObject flameGlowVisual;
         [SerializeField] private ItemDefinition hotPanDefinition;
@@ -15,7 +19,21 @@ namespace Dormitory7.Features.Cooking
         private FryingPanState _mountedPanState;
 
         public bool HasPan => _mountedPanItem != null;
+        public WorldItem MountedPanItem => _mountedPanItem;
         public FryingPanState MountedPanState => _mountedPanState;
+
+        public static event Action<StoveBurner, WorldItem, FryingPanState> OnPlayerTookPanFromBurner;
+
+        private void OnEnable()
+        {
+            if (!AllBurners.Contains(this))
+                AllBurners.Add(this);
+        }
+
+        private void OnDisable()
+        {
+            AllBurners.Remove(this);
+        }
 
         public void Configure(Transform anchor, GameObject flameVisual, ItemDefinition hotDef)
         {
@@ -182,6 +200,34 @@ namespace Dormitory7.Features.Cooking
             }
 
             context.Inventory.TryPickUp(pan);
+            OnPlayerTookPanFromBurner?.Invoke(this, pan, panState);
+        }
+
+        public WorldItem DetachPanForNpc()
+        {
+            if (_mountedPanItem == null) return null;
+
+            WorldItem pan = _mountedPanItem;
+            FryingPanState panState = _mountedPanState;
+
+            _mountedPanItem = null;
+            _mountedPanState = null;
+
+            if (flameGlowVisual != null)
+                flameGlowVisual.SetActive(false);
+
+            if (panState != null)
+            {
+                panState.SetOnBurner(false);
+                panState.HeatUpPanForPickup();
+            }
+            else if (hotPanDefinition != null)
+            {
+                pan.Initialize(hotPanDefinition);
+                pan.StartCooling();
+            }
+
+            return pan;
         }
     }
 }
