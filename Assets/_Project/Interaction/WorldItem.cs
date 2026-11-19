@@ -9,15 +9,17 @@ namespace Dormitory7.Interaction
     {
         [SerializeField] private ItemDefinition definition;
         [SerializeField] private Renderer[] tintRenderers;
+        [SerializeField] private bool startCoolingOnlyAfterPickup = true;
 
         private Rigidbody _rb;
         private Collider[] _colliders;
         private float _coolingTimer;
+        private bool _hasStartedCooling;
         private bool _isHeld;
 
         public ItemDefinition Definition => definition;
         public bool IsHeld => _isHeld;
-        public bool IsCooling => definition != null && definition.IsHot && _coolingTimer > 0f;
+        public bool IsCooling => definition != null && definition.IsHot && _hasStartedCooling && _coolingTimer > 0f;
         public float RemainingCoolingTime => _coolingTimer;
 
         public event Action<WorldItem, ItemDefinition> OnItemCooled;
@@ -47,17 +49,25 @@ namespace Dormitory7.Interaction
                 _rb.mass = Mathf.Max(0.2f, def.physicsMass);
 
             _coolingTimer = def.IsHot ? Mathf.Max(1f, def.coolingDurationSeconds) : 0f;
+            _hasStartedCooling = def.IsHot && !startCoolingOnlyAfterPickup;
             UpdateTintColor(def.tintColor);
+        }
+
+        public void StartCooling()
+        {
+            if (definition != null && definition.IsHot)
+                _hasStartedCooling = true;
         }
 
         private void Update()
         {
-            if (definition == null || !definition.IsHot) return;
+            if (definition == null || !definition.IsHot || !_hasStartedCooling) return;
 
             _coolingTimer -= Time.deltaTime;
             if (_coolingTimer <= 0f)
             {
                 _coolingTimer = 0f;
+                _hasStartedCooling = false;
                 ItemDefinition cooledDef = definition.coolsToItem;
                 definition = cooledDef;
                 ApplyDefinition(definition);
@@ -74,7 +84,9 @@ namespace Dormitory7.Interaction
                 if (context.IsCarryingTwoHanded)
                     return $"Руки зайняті ({definition.displayName})";
 
-                string hotSuffix = definition.IsHot ? $" (гаряча, {Mathf.CeilToInt(_coolingTimer)}с)" : "";
+                string hotSuffix = definition.IsHot
+                    ? (_hasStartedCooling ? $" (гаряча, {Mathf.CeilToInt(_coolingTimer)}с)" : " (гаряча!)")
+                    : "";
                 return $"[E] Взяти в руки: {definition.displayName}{hotSuffix}";
             }
 
@@ -107,6 +119,9 @@ namespace Dormitory7.Interaction
         public void SetHeldState(Transform anchor, Vector3 localOffset, Vector3 localEuler)
         {
             _isHeld = true;
+            if (definition != null && definition.IsHot)
+                _hasStartedCooling = true;
+
             if (_rb != null)
             {
                 if (!_rb.isKinematic)

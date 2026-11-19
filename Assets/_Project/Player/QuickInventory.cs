@@ -280,31 +280,83 @@ namespace Dormitory7.Player
             if (item == null) return false;
 
             Transform origin = cameraTransform != null ? cameraTransform : transform;
-            float spawnDist = balanceConfig.dropForwardOffset;
-            if (Physics.Raycast(origin.position, origin.forward, out RaycastHit hit, spawnDist + 0.25f, ~0, QueryTriggerInteraction.Ignore))
-                spawnDist = Mathf.Max(0.35f, hit.distance - 0.25f);
-
-            Vector3 spawnPos = origin.position + origin.forward * spawnDist;
-            Quaternion spawnRot = Quaternion.LookRotation(origin.forward, Vector3.up);
-
+            Vector3 spawnPos;
+            Quaternion spawnRot;
             Vector3 linearVel;
             Vector3 angularVel;
+
             if (isThrow)
             {
+                float spawnDist = balanceConfig.dropForwardOffset;
+                if (TryRaycastNonPlayer(origin.position, origin.forward, spawnDist + 0.25f, out RaycastHit wallHit))
+                    spawnDist = Mathf.Max(0.35f, wallHit.distance - 0.25f);
+
+                spawnPos = origin.position + origin.forward * spawnDist;
+                spawnRot = Quaternion.LookRotation(origin.forward, Vector3.up);
                 float mult = item.Definition != null ? Mathf.Max(0.35f, item.Definition.throwForceMultiplier) : 1f;
                 linearVel = origin.forward * (balanceConfig.baseThrowForce * mult) + Vector3.up * balanceConfig.throwUpwardBoost;
                 angularVel = origin.right * 4.5f;
             }
             else
             {
-                linearVel = origin.forward * 1.4f;
+                // Neat placement: if aiming at an upward surface (table, stove, floor) within reach, set it down cleanly
+                float halfHeight = EstimateItemHalfHeight(item);
+                spawnRot = Quaternion.Euler(0f, origin.eulerAngles.y, 0f);
+                linearVel = Vector3.zero;
                 angularVel = Vector3.zero;
+
+                if (TryRaycastNonPlayer(origin.position, origin.forward, balanceConfig.interactDistance, out RaycastHit surfaceHit)
+                    && surfaceHit.normal.y >= 0.65f)
+                {
+                    spawnPos = surfaceHit.point + Vector3.up * (halfHeight + 0.015f);
+                }
+                else
+                {
+                    float dropDist = Mathf.Min(0.8f, balanceConfig.dropForwardOffset);
+                    if (TryRaycastNonPlayer(origin.position, origin.forward, dropDist + 0.25f, out RaycastHit obstacleHit))
+                        dropDist = Mathf.Max(0.35f, obstacleHit.distance - 0.25f);
+
+                    spawnPos = origin.position + origin.forward * dropDist - Vector3.up * 0.2f;
+                    linearVel = origin.forward * 0.25f;
+                }
             }
 
             item.ReleaseToWorld(spawnPos, spawnRot, linearVel, angularVel);
             RefreshHeldVisuals();
             OnInventoryChanged?.Invoke();
             return true;
+        }
+
+        private bool TryRaycastNonPlayer(Vector3 origin, Vector3 direction, float maxDistance, out RaycastHit closestHit)
+        {
+            RaycastHit[] hits = Physics.RaycastAll(origin, direction, maxDistance, ~0, QueryTriggerInteraction.Ignore);
+            closestHit = default;
+            if (hits == null || hits.Length == 0) return false;
+
+            Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+            for (int i = 0; i < hits.Length; i++)
+            {
+                if (hits[i].collider == null) continue;
+                if (hits[i].collider.transform.IsChildOf(transform)) continue;
+                closestHit = hits[i];
+                return true;
+            }
+            return false;
+        }
+
+        private static float EstimateItemHalfHeight(WorldItem item)
+        {
+            if (item == null) return 0.12f;
+            var renderers = item.GetComponentsInChildren<Renderer>(true);
+            if (renderers != null && renderers.Length > 0)
+            {
+                Bounds combined = renderers[0].bounds;
+                for (int i = 1; i < renderers.Length; i++)
+                    combined.Encapsulate(renderers[i].bounds);
+                if (combined.extents.y > 0.01f)
+                    return combined.extents.y;
+            }
+            return Mathf.Max(0.06f, item.transform.lossyScale.y * 0.5f);
         }
 
         public bool UseActiveItem()
