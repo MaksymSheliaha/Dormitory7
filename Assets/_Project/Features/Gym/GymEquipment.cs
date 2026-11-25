@@ -302,7 +302,7 @@ namespace Dormitory7.Features.Gym
                     Vector3 localAway = p != null ? p.InverseTransformDirection(away) : away;
                     localAway.y = 0f;
                     if (localAway.sqrMagnitude > 0.001f)
-                        _bagSwingAxis = Vector3.Cross(Vector3.up, localAway.normalized).normalized;
+                        _bagSwingAxis = Vector3.Cross(localAway.normalized, Vector3.up).normalized;
                     _bagAngularVel = 155f;
                 }
                 AudioManager.Instance?.PlayBarbellClang(transform.position);
