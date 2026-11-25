@@ -17,7 +17,8 @@ namespace Dormitory7.Features.Gym
         SquatRack = 2,
         LegPress = 3,
         DumbbellBench = 4,
-        Kettlebells = 5
+        Kettlebells = 5,
+        PunchingBag = 6
     }
 
     public class GymEquipment : MonoBehaviour, IInteractable
@@ -51,6 +52,7 @@ namespace Dormitory7.Features.Gym
         private float _sweetMin;
         private float _sweetMax;
         private Vector3 _barRestLocalPos;
+        private Quaternion _barRestLocalRot;
         private float _barLiftVisual;
 
         private InputAction _balanceAxisAction;
@@ -70,7 +72,10 @@ namespace Dormitory7.Features.Gym
                 balanceConfig = ScriptableObject.CreateInstance<BalanceConfig>();
 
             if (animatedBarTransform != null)
+            {
                 _barRestLocalPos = animatedBarTransform.localPosition;
+                _barRestLocalRot = animatedBarTransform.localRotation;
+            }
 
             _balanceAxisAction = new InputAction("GymBalance", InputActionType.Value);
             _balanceAxisAction.AddCompositeBinding("1DAxis")
@@ -127,6 +132,7 @@ namespace Dormitory7.Features.Gym
                 GymStationType.LegPress => $"[E] Жим ногами на тренажері (+Витривалість, +Респект){buffTag}",
                 GymStationType.DumbbellBench => $"[E] Жим гантелей на лаві (+Сила, +Респект){buffTag}",
                 GymStationType.Kettlebells => $"[E] Ривок гирі (+Витривалість, +Респект){buffTag}",
+                GymStationType.PunchingBag => $"[E] Бити боксерську грушу (+Сила, +Витривалість, +Респект){buffTag}",
                 _ => $"[E] Тренування (+Респект){buffTag}"
             };
         }
@@ -236,11 +242,19 @@ namespace Dormitory7.Features.Gym
                 if (!IsWorkoutActive) return;
             }
 
-            // Smooth barbell lift animation & final-reps screen exertion pulse
+            // Smooth barbell lift / punching bag swing animation & final-reps screen exertion pulse
             if (animatedBarTransform != null)
             {
                 _barLiftVisual = Mathf.MoveTowards(_barLiftVisual, 0f, Time.deltaTime * 2.2f);
-                animatedBarTransform.localPosition = _barRestLocalPos + Vector3.up * (_barLiftVisual * 0.35f);
+                if (stationType == GymStationType.PunchingBag)
+                {
+                    float swing = Mathf.Sin(_barLiftVisual * Mathf.PI) * 16f;
+                    animatedBarTransform.localRotation = _barRestLocalRot * Quaternion.Euler(swing, 0f, 0f);
+                }
+                else
+                {
+                    animatedBarTransform.localPosition = _barRestLocalPos + Vector3.up * (_barLiftVisual * 0.35f);
+                }
             }
 
             bool isFinalReps = CompletedReps >= Mathf.Max(1, TargetReps - 2);
@@ -319,6 +333,11 @@ namespace Dormitory7.Features.Gym
                     _stats.ImproveStamina(1);
                     HudController.Instance?.ShowToast($"Ривок гирі виконано! Витривалість: {_stats.Stamina}/5 • +{Mathf.RoundToInt(respectReward)} Респекту!");
                     break;
+                case GymStationType.PunchingBag:
+                    _stats.ImproveStrength(1);
+                    _stats.ImproveStamina(1);
+                    HudController.Instance?.ShowToast($"Грушу відпрацьовано! Сила: {_stats.Strength}/5, Витривалість: {_stats.Stamina}/5 • +{Mathf.RoundToInt(respectReward)} Респекту!");
+                    break;
                 default:
                     _stats.ImproveStamina(1);
                     HudController.Instance?.ShowToast($"Турнік виконано! Витривалість: {_stats.Stamina}/5 • +{Mathf.RoundToInt(respectReward)} Респекту!");
@@ -343,6 +362,7 @@ namespace Dormitory7.Features.Gym
                 GymStationType.LegPress => "Звели ноги на жимі!",
                 GymStationType.DumbbellBench => "Впустив гантелі!",
                 GymStationType.Kettlebells => "Зірвав спину гирею!",
+                GymStationType.PunchingBag => "Вибив кисть об грушу!",
                 _ => "Зірвався з турніка!"
             };
             string msg = $"{failAction} -{Mathf.RoundToInt(balanceConfig.gymFailEnergyPenalty)}% Енергії, -{Mathf.RoundToInt(balanceConfig.gymFailRespectPenalty)} Респекту!";
@@ -362,7 +382,10 @@ namespace Dormitory7.Features.Gym
             _ctx.Controller?.SetMovementLocked(false);
             _ctx.Inventory?.SetInputLocked(false);
             if (animatedBarTransform != null)
+            {
                 animatedBarTransform.localPosition = _barRestLocalPos;
+                animatedBarTransform.localRotation = _barRestLocalRot;
+            }
             HudController.Instance?.HideQte();
         }
 
@@ -375,6 +398,7 @@ namespace Dormitory7.Features.Gym
                 GymStationType.LegPress => "ЖИМ НОГАМИ",
                 GymStationType.DumbbellBench => "ЖИМ ГАНТЕЛЕЙ",
                 GymStationType.Kettlebells => "РИВОК ГИРІ",
+                GymStationType.PunchingBag => "БОКСЕРСЬКА ГРУША",
                 _ => "ТУРНІК"
             };
             string title = IsBossChallengeActive
