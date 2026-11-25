@@ -30,6 +30,10 @@ namespace Dormitory7.Features.Cockroaches
         [SerializeField] private GameObject greenSplatVisual;
         [SerializeField] private ParticleSystem splatParticles;
         [SerializeField] private AudioSource scurryAudioSource;
+        [SerializeField] private Animator roachAnimator;
+
+        private static readonly int AnimSpeedHash = Animator.StringToHash("Speed");
+        private static readonly int AnimIsDeadHash = Animator.StringToHash("IsDead");
 
         public CockroachState State { get; private set; } = CockroachState.Patrolling;
         public bool IsAlive => State != CockroachState.Dead;
@@ -75,6 +79,17 @@ namespace Dormitory7.Features.Cockroaches
                 scurryAudioSource = GetComponent<AudioSource>();
             if (splatParticles == null)
                 splatParticles = GetComponentInChildren<ParticleSystem>(true);
+            if (roachAnimator == null)
+                roachAnimator = GetComponentInChildren<Animator>(true);
+            if (roachAnimator != null)
+            {
+                roachAnimator.applyRootMotion = false;
+                if (roachAnimator.runtimeAnimatorController != null)
+                {
+                    roachAnimator.SetBool(AnimIsDeadHash, false);
+                    roachAnimator.SetFloat(AnimSpeedHash, 1f);
+                }
+            }
         }
 
         private void OnEnable()
@@ -143,6 +158,13 @@ namespace Dormitory7.Features.Cockroaches
 
             if (scurryAudioSource != null && scurryAudioSource.isPlaying)
                 scurryAudioSource.pitch = State == CockroachState.Fleeing ? 1.45f : 0.95f;
+
+            if (roachAnimator != null && roachAnimator.runtimeAnimatorController != null)
+            {
+                bool fleeing = State == CockroachState.Fleeing;
+                roachAnimator.SetFloat(AnimSpeedHash, 1f);
+                roachAnimator.speed = fleeing ? 1.6f : 1.0f;
+            }
         }
 
         private void EvaluateThreats()
@@ -287,7 +309,12 @@ namespace Dormitory7.Features.Cockroaches
             State = CockroachState.Dead;
             LivingCockroaches.Remove(this);
 
-            if (bodyVisual != null)
+            if (roachAnimator != null && roachAnimator.runtimeAnimatorController != null)
+            {
+                roachAnimator.speed = 1f;
+                roachAnimator.SetBool(AnimIsDeadHash, true);
+            }
+            else if (bodyVisual != null)
             {
                 bodyVisual.localRotation = Quaternion.Euler(0f, 0f, 180f);
                 bodyVisual.localPosition = new Vector3(0f, 0.04f, 0f);
