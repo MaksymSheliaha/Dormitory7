@@ -13,7 +13,11 @@ namespace Dormitory7.Features.Gym
     public enum GymStationType
     {
         BenchPress = 0,
-        PullUpBar = 1
+        PullUpBar = 1,
+        SquatRack = 2,
+        LegPress = 3,
+        DumbbellBench = 4,
+        Kettlebells = 5
     }
 
     public class GymEquipment : MonoBehaviour, IInteractable
@@ -115,9 +119,16 @@ namespace Dormitory7.Features.Gym
                 return $"Замало енергії (<{Mathf.RoundToInt(balanceConfig.gymMinEnergyThreshold)}%) для тренування! Поїжте або випийте кави.";
 
             string buffTag = (context.Stats != null && context.Stats.HasGymBuff) ? " [БАФ КАВИ!]" : "";
-            return stationType == GymStationType.BenchPress
-                ? $"[E] Жим штанги з батарей (+Сила, +Респект){buffTag}"
-                : $"[E] Підтягування на турніку (+Витривалість, +Респект){buffTag}";
+            return stationType switch
+            {
+                GymStationType.BenchPress => $"[E] Жим штанги лежачи (+Сила, +Респект){buffTag}",
+                GymStationType.PullUpBar => $"[E] Підтягування на турніку (+Витривалість, +Респект){buffTag}",
+                GymStationType.SquatRack => $"[E] Присідання зі штангою (+Сила, +Витривалість, +Респект){buffTag}",
+                GymStationType.LegPress => $"[E] Жим ногами на тренажері (+Витривалість, +Респект){buffTag}",
+                GymStationType.DumbbellBench => $"[E] Жим гантелей на лаві (+Сила, +Респект){buffTag}",
+                GymStationType.Kettlebells => $"[E] Ривок гирі (+Витривалість, +Респект){buffTag}",
+                _ => $"[E] Тренування (+Респект){buffTag}"
+            };
         }
 
         public bool CanInteract(PlayerContext context)
@@ -284,16 +295,34 @@ namespace Dormitory7.Features.Gym
                 : balanceConfig.gymSuccessRespect;
             _stats.ModifyRespect(respectReward);
 
-            if (stationType == GymStationType.BenchPress)
+            switch (stationType)
             {
-                _stats.ImproveStrength(1);
-                string prefix = wasBossChallenge ? "ФІНАЛЬНИЙ ЖИМ З БОСОМ ВИГРАНО!" : "Жим виконано!";
-                HudController.Instance?.ShowToast($"{prefix} Сила: {_stats.Strength}/5 • +{Mathf.RoundToInt(respectReward)} Респекту!");
-            }
-            else
-            {
-                _stats.ImproveStamina(1);
-                HudController.Instance?.ShowToast($"Турнік виконано! Витривалість: {_stats.Stamina}/5 • +{Mathf.RoundToInt(respectReward)} Респекту!");
+                case GymStationType.BenchPress:
+                    _stats.ImproveStrength(1);
+                    string prefix = wasBossChallenge ? "ФІНАЛЬНИЙ ЖИМ З БОСОМ ВИГРАНО!" : "Жим виконано!";
+                    HudController.Instance?.ShowToast($"{prefix} Сила: {_stats.Strength}/5 • +{Mathf.RoundToInt(respectReward)} Респекту!");
+                    break;
+                case GymStationType.DumbbellBench:
+                    _stats.ImproveStrength(1);
+                    HudController.Instance?.ShowToast($"Жим гантелей виконано! Сила: {_stats.Strength}/5 • +{Mathf.RoundToInt(respectReward)} Респекту!");
+                    break;
+                case GymStationType.SquatRack:
+                    _stats.ImproveStrength(1);
+                    _stats.ImproveStamina(1);
+                    HudController.Instance?.ShowToast($"Присідання виконано! Сила: {_stats.Strength}/5, Витривалість: {_stats.Stamina}/5 • +{Mathf.RoundToInt(respectReward)} Респекту!");
+                    break;
+                case GymStationType.LegPress:
+                    _stats.ImproveStamina(1);
+                    HudController.Instance?.ShowToast($"Жим ногами виконано! Витривалість: {_stats.Stamina}/5 • +{Mathf.RoundToInt(respectReward)} Респекту!");
+                    break;
+                case GymStationType.Kettlebells:
+                    _stats.ImproveStamina(1);
+                    HudController.Instance?.ShowToast($"Ривок гирі виконано! Витривалість: {_stats.Stamina}/5 • +{Mathf.RoundToInt(respectReward)} Респекту!");
+                    break;
+                default:
+                    _stats.ImproveStamina(1);
+                    HudController.Instance?.ShowToast($"Турнік виконано! Витривалість: {_stats.Stamina}/5 • +{Mathf.RoundToInt(respectReward)} Респекту!");
+                    break;
             }
 
             OnAnyWorkoutCompleted?.Invoke(stationType, wasBossChallenge);
@@ -307,9 +336,16 @@ namespace Dormitory7.Features.Gym
             _stats.ModifyEnergy(-balanceConfig.gymFailEnergyPenalty);
             _stats.ModifyRespect(-balanceConfig.gymFailRespectPenalty);
 
-            string msg = stationType == GymStationType.BenchPress
-                ? $"Придавило штангою! -{Mathf.RoundToInt(balanceConfig.gymFailEnergyPenalty)}% Енергії, -{Mathf.RoundToInt(balanceConfig.gymFailRespectPenalty)} Респекту!"
-                : $"Зірвався з турніка! -{Mathf.RoundToInt(balanceConfig.gymFailEnergyPenalty)}% Енергії, -{Mathf.RoundToInt(balanceConfig.gymFailRespectPenalty)} Респекту!";
+            string failAction = stationType switch
+            {
+                GymStationType.BenchPress => "Придавило штангою!",
+                GymStationType.SquatRack => "Не втримав штангу в присіданні!",
+                GymStationType.LegPress => "Звели ноги на жимі!",
+                GymStationType.DumbbellBench => "Впустив гантелі!",
+                GymStationType.Kettlebells => "Зірвав спину гирею!",
+                _ => "Зірвався з турніка!"
+            };
+            string msg = $"{failAction} -{Mathf.RoundToInt(balanceConfig.gymFailEnergyPenalty)}% Енергії, -{Mathf.RoundToInt(balanceConfig.gymFailRespectPenalty)} Респекту!";
             HudController.Instance?.ShowToast(msg);
         }
 
@@ -332,11 +368,18 @@ namespace Dormitory7.Features.Gym
 
         private void PushHudQte()
         {
+            string stationTitle = stationType switch
+            {
+                GymStationType.BenchPress => "ЖИМ ШТАНГИ",
+                GymStationType.SquatRack => "ПРИСІДАННЯ ЗІ ШТАНГОЮ",
+                GymStationType.LegPress => "ЖИМ НОГАМИ",
+                GymStationType.DumbbellBench => "ЖИМ ГАНТЕЛЕЙ",
+                GymStationType.Kettlebells => "РИВОК ГИРІ",
+                _ => "ТУРНІК"
+            };
             string title = IsBossChallengeActive
                 ? $"ФІНАЛЬНИЙ ВИКЛИК БОСА: ЖИМ ({CompletedReps}/{TargetReps})"
-                : (stationType == GymStationType.BenchPress
-                    ? $"ЖИМ ШТАНГИ ({CompletedReps}/{TargetReps})"
-                    : $"ТУРНІК ({CompletedReps}/{TargetReps})");
+                : $"{stationTitle} ({CompletedReps}/{TargetReps})";
 
             HudController.Instance?.ShowQte(new QteDisplayState
             {
