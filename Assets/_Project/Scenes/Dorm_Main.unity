@@ -1031,15 +1031,15 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: -8679921383154817045, guid: e9971b766e9330f40bfc2be553659d4d, type: 3}
       propertyPath: m_LocalScale.x
-      value: 0.0088
+      value: 0.88
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: e9971b766e9330f40bfc2be553659d4d, type: 3}
       propertyPath: m_LocalScale.y
-      value: 0.0088
+      value: 0.88
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: e9971b766e9330f40bfc2be553659d4d, type: 3}
       propertyPath: m_LocalScale.z
-      value: 0.0088
+      value: 0.88
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: e9971b766e9330f40bfc2be553659d4d, type: 3}
       propertyPath: m_LocalPosition.x
@@ -1085,6 +1085,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: HorseModel
       objectReference: {fileID: 0}
+    - target: {fileID: 5866666021909216657, guid: e9971b766e9330f40bfc2be553659d4d, type: 3}
+      propertyPath: m_Avatar
+      value: 
+      objectReference: {fileID: 9000000, guid: 8c08b7740cc1bad44b84c4084c13beb6, type: 2}
     - target: {fileID: 5866666021909216657, guid: e9971b766e9330f40bfc2be553659d4d, type: 3}
       propertyPath: m_Controller
       value: 
