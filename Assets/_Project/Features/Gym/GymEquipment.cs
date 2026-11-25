@@ -13,7 +13,12 @@ namespace Dormitory7.Features.Gym
     public enum GymStationType
     {
         BenchPress = 0,
-        PullUpBar = 1
+        PullUpBar = 1,
+        SquatRack = 2,
+        LegPress = 3,
+        DumbbellBench = 4,
+        Kettlebells = 5,
+        PunchingBag = 6
     }
 
     public class GymEquipment : MonoBehaviour, IInteractable
@@ -47,7 +52,11 @@ namespace Dormitory7.Features.Gym
         private float _sweetMin;
         private float _sweetMax;
         private Vector3 _barRestLocalPos;
+        private Quaternion _barRestLocalRot;
         private float _barLiftVisual;
+        private float _bagAngle;
+        private float _bagAngularVel;
+        private Vector3 _bagSwingAxis = Vector3.right;
 
         private InputAction _balanceAxisAction;
         private InputAction _pushAction;
@@ -66,7 +75,10 @@ namespace Dormitory7.Features.Gym
                 balanceConfig = ScriptableObject.CreateInstance<BalanceConfig>();
 
             if (animatedBarTransform != null)
+            {
                 _barRestLocalPos = animatedBarTransform.localPosition;
+                _barRestLocalRot = animatedBarTransform.localRotation;
+            }
 
             _balanceAxisAction = new InputAction("GymBalance", InputActionType.Value);
             _balanceAxisAction.AddCompositeBinding("1DAxis")
@@ -115,9 +127,17 @@ namespace Dormitory7.Features.Gym
                 return $"Замало енергії (<{Mathf.RoundToInt(balanceConfig.gymMinEnergyThreshold)}%) для тренування! Поїжте або випийте кави.";
 
             string buffTag = (context.Stats != null && context.Stats.HasGymBuff) ? " [БАФ КАВИ!]" : "";
-            return stationType == GymStationType.BenchPress
-                ? $"[E] Жим штанги з батарей (+Сила, +Респект){buffTag}"
-                : $"[E] Підтягування на турніку (+Витривалість, +Респект){buffTag}";
+            return stationType switch
+            {
+                GymStationType.BenchPress => $"[E] Жим штанги лежачи (+Сила, +Респект){buffTag}",
+                GymStationType.PullUpBar => $"[E] Підтягування на турніку (+Витривалість, +Респект){buffTag}",
+                GymStationType.SquatRack => $"[E] Присідання зі штангою (+Сила, +Витривалість, +Респект){buffTag}",
+                GymStationType.LegPress => $"[E] Жим ногами на тренажері (+Витривалість, +Респект){buffTag}",
+                GymStationType.DumbbellBench => $"[E] Жим гантелей на лаві (+Сила, +Респект){buffTag}",
+                GymStationType.Kettlebells => $"[E] Ривок гирі (+Витривалість, +Респект){buffTag}",
+                GymStationType.PunchingBag => $"[E] Бити боксерську грушу (+Сила, +Витривалість, +Респект){buffTag}",
+                _ => $"[E] Тренування (+Респект){buffTag}"
+            };
         }
 
         public bool CanInteract(PlayerContext context)
@@ -225,11 +245,24 @@ namespace Dormitory7.Features.Gym
                 if (!IsWorkoutActive) return;
             }
 
-            // Smooth barbell lift animation & final-reps screen exertion pulse
+            // Smooth barbell lift / punching bag swing animation & final-reps screen exertion pulse
             if (animatedBarTransform != null)
             {
                 _barLiftVisual = Mathf.MoveTowards(_barLiftVisual, 0f, Time.deltaTime * 2.2f);
-                animatedBarTransform.localPosition = _barRestLocalPos + Vector3.up * (_barLiftVisual * 0.35f);
+                if (stationType == GymStationType.PunchingBag)
+                {
+                    // Damped spring pendulum swinging away from the player and smoothly back
+                    const float springK = 36f;
+                    const float damping = 5.2f;
+                    float accel = -springK * _bagAngle - damping * _bagAngularVel;
+                    _bagAngularVel += accel * Time.deltaTime;
+                    _bagAngle = Mathf.Clamp(_bagAngle + _bagAngularVel * Time.deltaTime, -28f, 28f);
+                    animatedBarTransform.localRotation = Quaternion.AngleAxis(_bagAngle, _bagSwingAxis) * _barRestLocalRot;
+                }
+                else
+                {
+                    animatedBarTransform.localPosition = _barRestLocalPos + Vector3.up * (_barLiftVisual * 0.35f);
+                }
             }
 
             bool isFinalReps = CompletedReps >= Mathf.Max(1, TargetReps - 2);
@@ -255,6 +288,23 @@ namespace Dormitory7.Features.Gym
             {
                 CompletedReps++;
                 _barLiftVisual = 1f;
+                if (stationType == GymStationType.PunchingBag && animatedBarTransform != null)
+                {
+                    Vector3 away = Vector3.forward;
+                    if (_ctx.Controller != null)
+                    {
+                        away = animatedBarTransform.position - _ctx.Controller.transform.position;
+                        away.y = 0f;
+                        if (away.sqrMagnitude < 0.001f) away = Vector3.forward;
+                        away.Normalize();
+                    }
+                    Transform p = animatedBarTransform.parent;
+                    Vector3 localAway = p != null ? p.InverseTransformDirection(away) : away;
+                    localAway.y = 0f;
+                    if (localAway.sqrMagnitude > 0.001f)
+                        _bagSwingAxis = Vector3.Cross(localAway.normalized, Vector3.up).normalized;
+                    _bagAngularVel = 155f;
+                }
                 AudioManager.Instance?.PlayBarbellClang(transform.position);
                 if (CompletedReps >= TargetReps)
                     TriggerWorkoutSuccess();
@@ -284,16 +334,39 @@ namespace Dormitory7.Features.Gym
                 : balanceConfig.gymSuccessRespect;
             _stats.ModifyRespect(respectReward);
 
-            if (stationType == GymStationType.BenchPress)
+            switch (stationType)
             {
-                _stats.ImproveStrength(1);
-                string prefix = wasBossChallenge ? "ФІНАЛЬНИЙ ЖИМ З БОСОМ ВИГРАНО!" : "Жим виконано!";
-                HudController.Instance?.ShowToast($"{prefix} Сила: {_stats.Strength}/5 • +{Mathf.RoundToInt(respectReward)} Респекту!");
-            }
-            else
-            {
-                _stats.ImproveStamina(1);
-                HudController.Instance?.ShowToast($"Турнік виконано! Витривалість: {_stats.Stamina}/5 • +{Mathf.RoundToInt(respectReward)} Респекту!");
+                case GymStationType.BenchPress:
+                    _stats.ImproveStrength(1);
+                    string prefix = wasBossChallenge ? "ФІНАЛЬНИЙ ЖИМ З БОСОМ ВИГРАНО!" : "Жим виконано!";
+                    HudController.Instance?.ShowToast($"{prefix} Сила: {_stats.Strength}/5 • +{Mathf.RoundToInt(respectReward)} Респекту!");
+                    break;
+                case GymStationType.DumbbellBench:
+                    _stats.ImproveStrength(1);
+                    HudController.Instance?.ShowToast($"Жим гантелей виконано! Сила: {_stats.Strength}/5 • +{Mathf.RoundToInt(respectReward)} Респекту!");
+                    break;
+                case GymStationType.SquatRack:
+                    _stats.ImproveStrength(1);
+                    _stats.ImproveStamina(1);
+                    HudController.Instance?.ShowToast($"Присідання виконано! Сила: {_stats.Strength}/5, Витривалість: {_stats.Stamina}/5 • +{Mathf.RoundToInt(respectReward)} Респекту!");
+                    break;
+                case GymStationType.LegPress:
+                    _stats.ImproveStamina(1);
+                    HudController.Instance?.ShowToast($"Жим ногами виконано! Витривалість: {_stats.Stamina}/5 • +{Mathf.RoundToInt(respectReward)} Респекту!");
+                    break;
+                case GymStationType.Kettlebells:
+                    _stats.ImproveStamina(1);
+                    HudController.Instance?.ShowToast($"Ривок гирі виконано! Витривалість: {_stats.Stamina}/5 • +{Mathf.RoundToInt(respectReward)} Респекту!");
+                    break;
+                case GymStationType.PunchingBag:
+                    _stats.ImproveStrength(1);
+                    _stats.ImproveStamina(1);
+                    HudController.Instance?.ShowToast($"Грушу відпрацьовано! Сила: {_stats.Strength}/5, Витривалість: {_stats.Stamina}/5 • +{Mathf.RoundToInt(respectReward)} Респекту!");
+                    break;
+                default:
+                    _stats.ImproveStamina(1);
+                    HudController.Instance?.ShowToast($"Турнік виконано! Витривалість: {_stats.Stamina}/5 • +{Mathf.RoundToInt(respectReward)} Респекту!");
+                    break;
             }
 
             OnAnyWorkoutCompleted?.Invoke(stationType, wasBossChallenge);
@@ -307,9 +380,17 @@ namespace Dormitory7.Features.Gym
             _stats.ModifyEnergy(-balanceConfig.gymFailEnergyPenalty);
             _stats.ModifyRespect(-balanceConfig.gymFailRespectPenalty);
 
-            string msg = stationType == GymStationType.BenchPress
-                ? $"Придавило штангою! -{Mathf.RoundToInt(balanceConfig.gymFailEnergyPenalty)}% Енергії, -{Mathf.RoundToInt(balanceConfig.gymFailRespectPenalty)} Респекту!"
-                : $"Зірвався з турніка! -{Mathf.RoundToInt(balanceConfig.gymFailEnergyPenalty)}% Енергії, -{Mathf.RoundToInt(balanceConfig.gymFailRespectPenalty)} Респекту!";
+            string failAction = stationType switch
+            {
+                GymStationType.BenchPress => "Придавило штангою!",
+                GymStationType.SquatRack => "Не втримав штангу в присіданні!",
+                GymStationType.LegPress => "Звели ноги на жимі!",
+                GymStationType.DumbbellBench => "Впустив гантелі!",
+                GymStationType.Kettlebells => "Зірвав спину гирею!",
+                GymStationType.PunchingBag => "Вибив кисть об грушу!",
+                _ => "Зірвався з турніка!"
+            };
+            string msg = $"{failAction} -{Mathf.RoundToInt(balanceConfig.gymFailEnergyPenalty)}% Енергії, -{Mathf.RoundToInt(balanceConfig.gymFailRespectPenalty)} Респекту!";
             HudController.Instance?.ShowToast(msg);
         }
 
@@ -325,18 +406,31 @@ namespace Dormitory7.Features.Gym
             _cancelAction.Disable();
             _ctx.Controller?.SetMovementLocked(false);
             _ctx.Inventory?.SetInputLocked(false);
+            _bagAngle = 0f;
+            _bagAngularVel = 0f;
             if (animatedBarTransform != null)
+            {
                 animatedBarTransform.localPosition = _barRestLocalPos;
+                animatedBarTransform.localRotation = _barRestLocalRot;
+            }
             HudController.Instance?.HideQte();
         }
 
         private void PushHudQte()
         {
+            string stationTitle = stationType switch
+            {
+                GymStationType.BenchPress => "ЖИМ ШТАНГИ",
+                GymStationType.SquatRack => "ПРИСІДАННЯ ЗІ ШТАНГОЮ",
+                GymStationType.LegPress => "ЖИМ НОГАМИ",
+                GymStationType.DumbbellBench => "ЖИМ ГАНТЕЛЕЙ",
+                GymStationType.Kettlebells => "РИВОК ГИРІ",
+                GymStationType.PunchingBag => "БОКСЕРСЬКА ГРУША",
+                _ => "ТУРНІК"
+            };
             string title = IsBossChallengeActive
                 ? $"ФІНАЛЬНИЙ ВИКЛИК БОСА: ЖИМ ({CompletedReps}/{TargetReps})"
-                : (stationType == GymStationType.BenchPress
-                    ? $"ЖИМ ШТАНГИ ({CompletedReps}/{TargetReps})"
-                    : $"ТУРНІК ({CompletedReps}/{TargetReps})");
+                : $"{stationTitle} ({CompletedReps}/{TargetReps})";
 
             HudController.Instance?.ShowQte(new QteDisplayState
             {

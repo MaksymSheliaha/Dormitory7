@@ -61,6 +61,17 @@ namespace Dormitory7.Audio
 
         public MusicZone ActiveMusicZone { get; private set; } = MusicZone.CorridorEerie;
         public float CurrentDangerLevel { get; private set; }
+        public AudioClip DefaultGymPhonkClip => musicGymPhonk;
+
+        public void SetGymMusicClip(AudioClip clip)
+        {
+            if (_musicGymSource == null) return;
+            AudioClip target = clip != null ? clip : musicGymPhonk;
+            if (_musicGymSource.clip == target && _musicGymSource.isPlaying) return;
+            _musicGymSource.clip = target;
+            if (target != null)
+                _musicGymSource.Play();
+        }
         public int PlayedSfxCount { get; private set; }
 
         private AudioSource[] _spatialPool;
