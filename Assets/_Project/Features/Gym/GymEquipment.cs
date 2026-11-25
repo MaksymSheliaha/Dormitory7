@@ -54,6 +54,9 @@ namespace Dormitory7.Features.Gym
         private Vector3 _barRestLocalPos;
         private Quaternion _barRestLocalRot;
         private float _barLiftVisual;
+        private float _bagAngle;
+        private float _bagAngularVel;
+        private Vector3 _bagSwingAxis = Vector3.right;
 
         private InputAction _balanceAxisAction;
         private InputAction _pushAction;
@@ -248,8 +251,13 @@ namespace Dormitory7.Features.Gym
                 _barLiftVisual = Mathf.MoveTowards(_barLiftVisual, 0f, Time.deltaTime * 2.2f);
                 if (stationType == GymStationType.PunchingBag)
                 {
-                    float swing = Mathf.Sin(_barLiftVisual * Mathf.PI) * 16f;
-                    animatedBarTransform.localRotation = _barRestLocalRot * Quaternion.Euler(swing, 0f, 0f);
+                    // Damped spring pendulum swinging away from the player and smoothly back
+                    const float springK = 36f;
+                    const float damping = 5.2f;
+                    float accel = -springK * _bagAngle - damping * _bagAngularVel;
+                    _bagAngularVel += accel * Time.deltaTime;
+                    _bagAngle = Mathf.Clamp(_bagAngle + _bagAngularVel * Time.deltaTime, -28f, 28f);
+                    animatedBarTransform.localRotation = Quaternion.AngleAxis(_bagAngle, _bagSwingAxis) * _barRestLocalRot;
                 }
                 else
                 {
@@ -280,6 +288,23 @@ namespace Dormitory7.Features.Gym
             {
                 CompletedReps++;
                 _barLiftVisual = 1f;
+                if (stationType == GymStationType.PunchingBag && animatedBarTransform != null)
+                {
+                    Vector3 away = Vector3.forward;
+                    if (_ctx.Controller != null)
+                    {
+                        away = animatedBarTransform.position - _ctx.Controller.transform.position;
+                        away.y = 0f;
+                        if (away.sqrMagnitude < 0.001f) away = Vector3.forward;
+                        away.Normalize();
+                    }
+                    Transform p = animatedBarTransform.parent;
+                    Vector3 localAway = p != null ? p.InverseTransformDirection(away) : away;
+                    localAway.y = 0f;
+                    if (localAway.sqrMagnitude > 0.001f)
+                        _bagSwingAxis = Vector3.Cross(Vector3.up, localAway.normalized).normalized;
+                    _bagAngularVel = 155f;
+                }
                 AudioManager.Instance?.PlayBarbellClang(transform.position);
                 if (CompletedReps >= TargetReps)
                     TriggerWorkoutSuccess();
@@ -381,6 +406,8 @@ namespace Dormitory7.Features.Gym
             _cancelAction.Disable();
             _ctx.Controller?.SetMovementLocked(false);
             _ctx.Inventory?.SetInputLocked(false);
+            _bagAngle = 0f;
+            _bagAngularVel = 0f;
             if (animatedBarTransform != null)
             {
                 animatedBarTransform.localPosition = _barRestLocalPos;
