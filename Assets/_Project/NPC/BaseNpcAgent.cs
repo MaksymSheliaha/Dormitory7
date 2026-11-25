@@ -14,6 +14,7 @@ namespace Dormitory7.NPC
         [Header("References")]
         [SerializeField] protected DayTimeController dayTimeController;
         [SerializeField] protected NavMeshAgent navAgent;
+        [SerializeField] protected Animator characterAnimator;
 
         [Header("Movement Settings")]
         [SerializeField] protected float walkSpeed = 2.6f;
@@ -31,6 +32,7 @@ namespace Dormitory7.NPC
         private float _doorCheckTimer;
         private bool _wasStoppedBeforePause;
         private DoorInteractable[] _cachedDoors;
+        private static readonly int AnimSpeedHash = Animator.StringToHash("Speed");
 
         public NavMeshAgent Agent => navAgent;
         public NpcWaypoint CurrentTargetWaypoint { get; private set; }
@@ -48,6 +50,12 @@ namespace Dormitory7.NPC
         {
             if (navAgent == null)
                 navAgent = GetComponent<NavMeshAgent>();
+
+            if (characterAnimator == null)
+                characterAnimator = GetComponentInChildren<Animator>();
+
+            if (characterAnimator != null)
+                characterAnimator.applyRootMotion = false;
 
             if (navAgent != null)
             {
@@ -136,6 +144,7 @@ namespace Dormitory7.NPC
                     _wasStoppedBeforePause = false;
                     navAgent.isStopped = true;
                 }
+                UpdateAnimatorSpeed(0f);
                 return;
             }
             else if (!_wasStoppedBeforePause && navAgent.isStopped && (IsPatrolling || navAgent.hasPath))
@@ -148,6 +157,16 @@ namespace Dormitory7.NPC
 
             if (IsPatrolling)
                 UpdatePatrol();
+
+            UpdateAnimatorSpeed(navAgent.isStopped ? 0f : navAgent.velocity.magnitude);
+        }
+
+        private void UpdateAnimatorSpeed(float speed)
+        {
+            if (characterAnimator == null || !characterAnimator.isActiveAndEnabled || characterAnimator.runtimeAnimatorController == null)
+                return;
+
+            characterAnimator.SetFloat(AnimSpeedHash, speed, 0.1f, Time.deltaTime);
         }
 
         private void UpdateDoorProximity()
