@@ -496,10 +496,6 @@ PrefabInstance:
       propertyPath: m_UpdateWhenOffscreen
       value: 1
       objectReference: {fileID: 0}
-    - target: {fileID: -5217598891186012109, guid: c5f8b36a957e46147b70ec44a22631ab, type: 3}
-      propertyPath: 'm_Materials.Array.data[0]'
-      value: 
-      objectReference: {fileID: 2100000, guid: b29a346fad4e6b943915aaf1d65ee382, type: 2}
     - target: {fileID: 919132149155446097, guid: c5f8b36a957e46147b70ec44a22631ab, type: 3}
       propertyPath: m_Name
       value: GymBoss
