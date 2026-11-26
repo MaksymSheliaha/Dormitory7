@@ -106,7 +106,6 @@ MonoBehaviour:
   doorAutoCloseDelay: 3.5
   balanceConfig: {fileID: 11400000, guid: 11e99ab2780ca8b41b82e4386ec8aeae, type: 2}
   statsManager: {fileID: 0}
-  animator: {fileID: 4350747382630038722}
   rightArmPivot: {fileID: 0}
   moodIndicatorRenderer: {fileID: 8396585631520307330}
   overheadLabel: {fileID: 7411635262438640215}

@@ -166,7 +166,10 @@ namespace Dormitory7.NPC
             if (characterAnimator == null || !characterAnimator.isActiveAndEnabled || characterAnimator.runtimeAnimatorController == null)
                 return;
 
-            characterAnimator.SetFloat(AnimSpeedHash, speed, 0.1f, Time.deltaTime);
+            if (Time.deltaTime <= 0f)
+                characterAnimator.SetFloat(AnimSpeedHash, speed);
+            else
+                characterAnimator.SetFloat(AnimSpeedHash, speed, 0.1f, Time.deltaTime);
         }
 
         private void UpdateDoorProximity()
