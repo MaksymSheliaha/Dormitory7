@@ -32,9 +32,15 @@ namespace Dormitory7.NPC
         [Header("Gym Boss Config")]
         [SerializeField] private BalanceConfig balanceConfig;
         [SerializeField] private DormStatsManager statsManager;
+        [SerializeField] private Animator animator;
         [SerializeField] private Transform rightArmPivot;
         [SerializeField] private Renderer moodIndicatorRenderer;
         [SerializeField] private TextMeshPro overheadLabel;
+
+        private static readonly int SpeedHash = Animator.StringToHash("Speed");
+        private static readonly int FlexHash = Animator.StringToHash("Flex");
+        private static readonly int AngryHash = Animator.StringToHash("Angry");
+        private static readonly int IsAngryHash = Animator.StringToHash("IsAngry");
 
         public GymBossMood Mood { get; private set; } = GymBossMood.Neutral;
         public GymBossScheduleSlot CurrentSlot { get; private set; } = GymBossScheduleSlot.MorningShower;
@@ -104,6 +110,7 @@ namespace Dormitory7.NPC
                 HasCompletedFridayChallenge = true;
                 SetMood(GymBossMood.Pleased);
                 _handshakeAnimTimer = 1.0f;
+                TriggerFlex();
                 OnFridayChallengeWon?.Invoke();
             }
         }
@@ -129,6 +136,10 @@ namespace Dormitory7.NPC
         protected override void Awake()
         {
             base.Awake();
+            if (animator == null)
+                animator = characterAnimator != null ? characterAnimator : GetComponentInChildren<Animator>();
+            if (characterAnimator == null)
+                characterAnimator = animator;
             if (balanceConfig == null)
                 balanceConfig = ScriptableObject.CreateInstance<BalanceConfig>();
             walkSpeed = 2.4f;
@@ -148,6 +159,10 @@ namespace Dormitory7.NPC
         protected override void Start()
         {
             base.Start();
+            if (animator == null)
+                animator = characterAnimator != null ? characterAnimator : GetComponentInChildren<Animator>();
+            if (characterAnimator == null)
+                characterAnimator = animator;
             if (statsManager == null)
                 statsManager = FindAnyObjectByType<DormStatsManager>();
 
@@ -164,13 +179,27 @@ namespace Dormitory7.NPC
         {
             base.Update();
 
+            bool handledByBase = characterAnimator != null && characterAnimator == animator && navAgent != null && navAgent.isOnNavMesh;
+
             if (GameStateManager.Instance != null && GameStateManager.Instance.CurrentState != GameState.Playing)
+            {
+                if (!handledByBase)
+                    UpdateAnimatorSpeed(0f);
                 return;
+            }
 
             if (IsArmWrestlingActive)
             {
+                if (!handledByBase)
+                    UpdateAnimatorSpeed(0f);
                 UpdateArmWrestlingQte();
                 return;
+            }
+
+            if (!handledByBase)
+            {
+                float moveSpeed = (navAgent != null && navAgent.isOnNavMesh) ? navAgent.velocity.magnitude : 0f;
+                UpdateAnimatorSpeed(moveSpeed);
             }
 
             // Face player politely when stopped nearby
@@ -291,11 +320,42 @@ namespace Dormitory7.NPC
             }
             Mood = newMood;
             UpdateMoodVisuals();
+            if (Mood == GymBossMood.Angry)
+                TriggerAngry();
             OnMoodChanged?.Invoke(Mood);
+        }
+
+        private void UpdateAnimatorSpeed(float speed)
+        {
+            if (animator != null && animator.isActiveAndEnabled && animator.runtimeAnimatorController != null)
+            {
+                animator.SetFloat(SpeedHash, speed, 0.12f, Time.deltaTime);
+            }
+        }
+
+        private void TriggerFlex()
+        {
+            if (animator != null && animator.isActiveAndEnabled && animator.runtimeAnimatorController != null)
+            {
+                animator.SetTrigger(FlexHash);
+            }
+        }
+
+        private void TriggerAngry()
+        {
+            if (animator != null && animator.isActiveAndEnabled && animator.runtimeAnimatorController != null)
+            {
+                animator.SetTrigger(AngryHash);
+            }
         }
 
         private void UpdateMoodVisuals()
         {
+            if (animator != null && animator.isActiveAndEnabled && animator.runtimeAnimatorController != null)
+            {
+                animator.SetBool(IsAngryHash, Mood == GymBossMood.Angry);
+            }
+
             Color c = Mood switch
             {
                 GymBossMood.Pleased => MoodPleasedColor,
@@ -401,6 +461,7 @@ namespace Dormitory7.NPC
                     stats?.ModifyRespect(giftBonus);
                     SetMood(GymBossMood.Pleased);
                     _handshakeAnimTimer = 0.7f;
+                    TriggerFlex();
                     OnGiftReceived?.Invoke(active, giftBonus);
                     HudController.Instance?.ShowToast(
                         $"Бос качалки: «Оце підгон — {giftName}! Повага, першокурсник!» (+{Mathf.RoundToInt(giftBonus)} Респекту)");
@@ -419,6 +480,7 @@ namespace Dormitory7.NPC
                 stats?.ModifyRespect(gain);
                 SetMood(GymBossMood.Pleased);
                 _handshakeAnimTimer = 0.85f;
+                TriggerFlex();
                 AudioManager.Instance?.PlayBossHandshake(transform.position + Vector3.up * 1.3f);
                 OnPlayerGreeted?.Invoke(morningBonus, gain);
 
@@ -435,6 +497,7 @@ namespace Dormitory7.NPC
                 GymEquipment bench = FindBenchPress();
                 if (bench != null)
                 {
+                    TriggerFlex();
                     HudController.Instance?.ShowToast("БОС КАЧАЛКИ: «П'ятничний екзамен! Покажи, на що здатен на жимі!»");
                     bench.StartBossChallenge(context);
                 }
@@ -541,6 +604,7 @@ namespace Dormitory7.NPC
                 stats?.ModifyRespect(winResp);
                 SetMood(GymBossMood.Pleased);
                 _handshakeAnimTimer = 0.9f;
+                TriggerFlex();
                 AudioManager.Instance?.PlayBossHandshake(transform.position + Vector3.up * 1.3f);
                 HudController.Instance?.ShowToast(
                     $"ПЕРЕМОГА В АРМРЕСЛІНГУ! Ти поклав руку Боса качалки! (+{Mathf.RoundToInt(winResp)} Респекту)");
