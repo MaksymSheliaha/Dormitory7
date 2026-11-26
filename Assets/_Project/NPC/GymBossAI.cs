@@ -32,7 +32,6 @@ namespace Dormitory7.NPC
         [Header("Gym Boss Config")]
         [SerializeField] private BalanceConfig balanceConfig;
         [SerializeField] private DormStatsManager statsManager;
-        [SerializeField] private Transform rightArmPivot;
         [SerializeField] private Renderer moodIndicatorRenderer;
         [SerializeField] private TextMeshPro overheadLabel;
 
@@ -82,7 +81,6 @@ namespace Dormitory7.NPC
         public event Action<bool> OnArmWrestleFinished;
 
         private bool _scheduleInitialized;
-        private float _handshakeAnimTimer;
         private bool _isPlayingInteractionAnim;
         private bool _hasEnteredInteractionState;
         private int _activeInteractionStateHash;
@@ -125,7 +123,6 @@ namespace Dormitory7.NPC
             {
                 HasCompletedFridayChallenge = true;
                 SetMood(GymBossMood.Pleased);
-                _handshakeAnimTimer = 1.0f;
                 BeginInteractionAnimation(facePlayerOnce: true);
                 OnFridayChallengeWon?.Invoke();
             }
@@ -138,13 +135,11 @@ namespace Dormitory7.NPC
         public void Configure(
             BalanceConfig config,
             DormStatsManager stats,
-            Transform armPivot,
             Renderer moodRenderer,
             TextMeshPro label)
         {
             balanceConfig = config;
             statsManager = stats;
-            rightArmPivot = armPivot;
             moodIndicatorRenderer = moodRenderer;
             overheadLabel = label;
         }
@@ -213,21 +208,6 @@ namespace Dormitory7.NPC
                 UpdateLockedFaceRotation(8f);
                 UpdateInteractionAnimationPause();
                 return;
-            }
-
-            // Simple handshake arm-pump animation
-            if (rightArmPivot != null)
-            {
-                if (_handshakeAnimTimer > 0f)
-                {
-                    _handshakeAnimTimer = Mathf.Max(0f, _handshakeAnimTimer - Time.deltaTime);
-                    float swing = Mathf.Sin(_handshakeAnimTimer * 18f) * 28f;
-                    rightArmPivot.localRotation = Quaternion.Euler(-55f + swing, 0f, 0f);
-                }
-                else
-                {
-                    rightArmPivot.localRotation = Quaternion.Slerp(rightArmPivot.localRotation, Quaternion.identity, Time.deltaTime * 8f);
-                }
             }
         }
 
@@ -537,7 +517,6 @@ namespace Dormitory7.NPC
                     GiftsGivenToday++;
                     stats?.ModifyRespect(giftBonus);
                     SetMood(GymBossMood.Pleased);
-                    _handshakeAnimTimer = 0.7f;
                     BeginInteractionAnimation(ConsumeHash, ConsumeStateHash, facePlayerOnce: true);
                     OnGiftReceived?.Invoke(active, giftBonus);
                     HudController.Instance?.ShowToast(
@@ -556,7 +535,6 @@ namespace Dormitory7.NPC
 
                 stats?.ModifyRespect(gain);
                 SetMood(GymBossMood.Pleased);
-                _handshakeAnimTimer = 0.85f;
                 BeginInteractionAnimation(facePlayerOnce: true);
                 AudioManager.Instance?.PlayBossHandshake(transform.position + Vector3.up * 1.3f);
                 OnPlayerGreeted?.Invoke(morningBonus, gain);
@@ -670,7 +648,6 @@ namespace Dormitory7.NPC
             float strMult = stats != null ? stats.StrengthSpeedMultiplier : 1f;
             float push = (inSweetSpot ? 0.14f : 0.06f) * strMult;
             ArmWrestleMeter = Mathf.Clamp01(ArmWrestleMeter + push);
-            _handshakeAnimTimer = 0.22f;
             if (ArmWrestleMeter >= 1f)
                 FinishArmWrestling(playerWon: true);
         }
@@ -688,7 +665,6 @@ namespace Dormitory7.NPC
                 float winResp = balanceConfig != null ? balanceConfig.armWrestleWinRespect : 12f;
                 stats?.ModifyRespect(winResp);
                 SetMood(GymBossMood.Pleased);
-                _handshakeAnimTimer = 0.9f;
                 BeginInteractionAnimation(facePlayerOnce: false);
                 AudioManager.Instance?.PlayBossHandshake(transform.position + Vector3.up * 1.3f);
                 HudController.Instance?.ShowToast(
@@ -704,7 +680,6 @@ namespace Dormitory7.NPC
                 float loseEnergy = balanceConfig != null ? balanceConfig.armWrestleLoseEnergy : 8f;
                 stats?.ModifyRespect(-loseResp);
                 stats?.ModifyEnergy(-loseEnergy);
-                _handshakeAnimTimer = 0.9f;
                 BeginInteractionAnimation(facePlayerOnce: false);
                 HudController.Instance?.ShowToast(
                     $"Бос поклав твою руку! (-{Mathf.RoundToInt(loseEnergy)}% Енергії, -{Mathf.RoundToInt(loseResp)} Респекту). Підкачай Силу на штанзі!");
