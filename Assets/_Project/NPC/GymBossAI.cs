@@ -32,9 +32,19 @@ namespace Dormitory7.NPC
         [Header("Gym Boss Config")]
         [SerializeField] private BalanceConfig balanceConfig;
         [SerializeField] private DormStatsManager statsManager;
-        [SerializeField] private Transform rightArmPivot;
         [SerializeField] private Renderer moodIndicatorRenderer;
         [SerializeField] private TextMeshPro overheadLabel;
+
+        private static readonly int FlexHash = Animator.StringToHash("Flex");
+        private static readonly int FlexStateHash = Animator.StringToHash("Flex");
+        private static readonly int ConsumeHash = Animator.StringToHash("Consume");
+        private static readonly int ConsumeStateHash = Animator.StringToHash("Consume");
+        private static readonly int SpeedHash = Animator.StringToHash("Speed");
+        private static readonly int IsAngryHash = Animator.StringToHash("IsAngry");
+
+        private const float InteractionAnimEnterGraceSeconds = 0.35f;
+        private const float InteractionAnimFallbackSeconds = 4.4f;
+        private const float InteractionAnimMaxSeconds = 5.5f;
 
         public GymBossMood Mood { get; private set; } = GymBossMood.Neutral;
         public GymBossScheduleSlot CurrentSlot { get; private set; } = GymBossScheduleSlot.MorningShower;
@@ -42,6 +52,7 @@ namespace Dormitory7.NPC
         public int GiftsGivenToday { get; private set; }
         public bool HasCompletedFridayChallenge { get; private set; }
         public bool IsArmWrestlingActive { get; private set; }
+        public bool IsPlayingInteractionAnim => _isPlayingInteractionAnim;
         public float ArmWrestleMeter { get; private set; } // 0 = Boss wins, 0.5 = center, 1 = Player wins
         public int LastArmWrestleDay { get; private set; } = -10;
 
@@ -70,7 +81,12 @@ namespace Dormitory7.NPC
         public event Action<bool> OnArmWrestleFinished;
 
         private bool _scheduleInitialized;
-        private float _handshakeAnimTimer;
+        private bool _isPlayingInteractionAnim;
+        private bool _hasEnteredInteractionState;
+        private int _activeInteractionStateHash;
+        private float _interactionAnimElapsed;
+        private bool _hasLockedFaceRotation;
+        private Quaternion _lockedFaceRotation;
         private Transform _playerTransform;
         private PlayerContext _armWrestleCtx;
         private float _armWrestleNeedle;
@@ -85,8 +101,12 @@ namespace Dormitory7.NPC
 
         private void OnDisable()
         {
+            _isPlayingInteractionAnim = false;
+            _hasEnteredInteractionState = false;
+            _activeInteractionStateHash = 0;
+            _hasLockedFaceRotation = false;
             if (IsArmWrestlingActive)
-                StopArmWrestleCleanly();
+                StopArmWrestleCleanly(resumeSchedule: false);
             GymEquipment.OnAnyWorkoutCompleted -= HandleWorkoutCompleted;
         }
 
@@ -103,7 +123,7 @@ namespace Dormitory7.NPC
             {
                 HasCompletedFridayChallenge = true;
                 SetMood(GymBossMood.Pleased);
-                _handshakeAnimTimer = 1.0f;
+                BeginInteractionAnimation(facePlayerOnce: true);
                 OnFridayChallengeWon?.Invoke();
             }
         }
@@ -115,13 +135,11 @@ namespace Dormitory7.NPC
         public void Configure(
             BalanceConfig config,
             DormStatsManager stats,
-            Transform armPivot,
             Renderer moodRenderer,
             TextMeshPro label)
         {
             balanceConfig = config;
             statsManager = stats;
-            rightArmPivot = armPivot;
             moodIndicatorRenderer = moodRenderer;
             overheadLabel = label;
         }
@@ -148,6 +166,8 @@ namespace Dormitory7.NPC
         protected override void Start()
         {
             base.Start();
+            if (characterAnimator == null)
+                characterAnimator = GetComponentInChildren<Animator>();
             if (statsManager == null)
                 statsManager = FindAnyObjectByType<DormStatsManager>();
 
@@ -167,24 +187,6 @@ namespace Dormitory7.NPC
             if (GameStateManager.Instance != null && GameStateManager.Instance.CurrentState != GameState.Playing)
                 return;
 
-            if (IsArmWrestlingActive)
-            {
-                UpdateArmWrestlingQte();
-                return;
-            }
-
-            // Face player politely when stopped nearby
-            if (_playerTransform != null && HasArrived)
-            {
-                Vector3 toPlayer = _playerTransform.position - transform.position;
-                toPlayer.y = 0f;
-                if (toPlayer.sqrMagnitude < 16f && toPlayer.sqrMagnitude > 0.04f)
-                {
-                    Quaternion lookRot = Quaternion.LookRotation(toPlayer.normalized, Vector3.up);
-                    transform.rotation = Quaternion.Slerp(transform.rotation, lookRot, Time.deltaTime * 5f);
-                }
-            }
-
             // Keep overhead label readable toward camera
             if (overheadLabel != null && Camera.main != null)
             {
@@ -194,19 +196,114 @@ namespace Dormitory7.NPC
                     overheadLabel.transform.rotation = Quaternion.LookRotation(dir);
             }
 
-            // Simple handshake arm-pump animation
-            if (rightArmPivot != null)
+            if (IsArmWrestlingActive)
             {
-                if (_handshakeAnimTimer > 0f)
+                UpdateLockedFaceRotation(8f);
+                UpdateArmWrestlingQte();
+                return;
+            }
+
+            if (_isPlayingInteractionAnim)
+            {
+                UpdateLockedFaceRotation(8f);
+                UpdateInteractionAnimationPause();
+                return;
+            }
+        }
+
+        private void LockFaceDirectionTowardPlayer()
+        {
+            if (_playerTransform == null)
+            {
+                var playerGo = GameObject.FindWithTag("Player");
+                if (playerGo != null)
+                    _playerTransform = playerGo.transform;
+            }
+
+            if (_playerTransform == null) return;
+            Vector3 toPlayer = _playerTransform.position - transform.position;
+            toPlayer.y = 0f;
+            if (toPlayer.sqrMagnitude > 0.04f)
+            {
+                _lockedFaceRotation = Quaternion.LookRotation(toPlayer.normalized, Vector3.up);
+                _hasLockedFaceRotation = true;
+            }
+        }
+
+        private void UpdateLockedFaceRotation(float turnSpeed)
+        {
+            if (!_hasLockedFaceRotation) return;
+            transform.rotation = Quaternion.Slerp(transform.rotation, _lockedFaceRotation, Time.deltaTime * turnSpeed);
+            if (Quaternion.Angle(transform.rotation, _lockedFaceRotation) < 1f)
+            {
+                transform.rotation = _lockedFaceRotation;
+                _hasLockedFaceRotation = false;
+            }
+        }
+
+        private void BeginInteractionAnimation(bool facePlayerOnce)
+        {
+            BeginInteractionAnimation(FlexHash, FlexStateHash, facePlayerOnce);
+        }
+
+        private void BeginInteractionAnimation(int triggerHash, int stateHash, bool facePlayerOnce)
+        {
+            StopMovement();
+            if (navAgent != null && navAgent.isOnNavMesh)
+            {
+                navAgent.isStopped = true;
+                navAgent.velocity = Vector3.zero;
+            }
+
+            if (characterAnimator != null && characterAnimator.isActiveAndEnabled && characterAnimator.runtimeAnimatorController != null)
+                characterAnimator.SetFloat(SpeedHash, 0f);
+
+            _isPlayingInteractionAnim = true;
+            _hasEnteredInteractionState = false;
+            _activeInteractionStateHash = stateHash;
+            _interactionAnimElapsed = 0f;
+            _hasLockedFaceRotation = false;
+
+            if (facePlayerOnce)
+                LockFaceDirectionTowardPlayer();
+
+            TriggerAnimator(triggerHash);
+        }
+
+        private void UpdateInteractionAnimationPause()
+        {
+            _interactionAnimElapsed += Time.deltaTime;
+
+            bool finished;
+            if (characterAnimator != null && characterAnimator.isActiveAndEnabled && characterAnimator.runtimeAnimatorController != null)
+            {
+                var cur = characterAnimator.GetCurrentAnimatorStateInfo(0);
+                bool inTarget = cur.shortNameHash == _activeInteractionStateHash;
+                if (!inTarget && characterAnimator.IsInTransition(0))
                 {
-                    _handshakeAnimTimer = Mathf.Max(0f, _handshakeAnimTimer - Time.deltaTime);
-                    float swing = Mathf.Sin(_handshakeAnimTimer * 18f) * 28f;
-                    rightArmPivot.localRotation = Quaternion.Euler(-55f + swing, 0f, 0f);
+                    var next = characterAnimator.GetNextAnimatorStateInfo(0);
+                    inTarget = next.shortNameHash == _activeInteractionStateHash;
                 }
-                else
-                {
-                    rightArmPivot.localRotation = Quaternion.Slerp(rightArmPivot.localRotation, Quaternion.identity, Time.deltaTime * 8f);
-                }
+
+                if (inTarget)
+                    _hasEnteredInteractionState = true;
+
+                finished = (_hasEnteredInteractionState && !inTarget)
+                    || (!_hasEnteredInteractionState && _interactionAnimElapsed >= InteractionAnimEnterGraceSeconds)
+                    || _interactionAnimElapsed >= InteractionAnimMaxSeconds;
+            }
+            else
+            {
+                finished = _interactionAnimElapsed >= InteractionAnimFallbackSeconds;
+            }
+
+            if (finished)
+            {
+                _isPlayingInteractionAnim = false;
+                _hasEnteredInteractionState = false;
+                _activeInteractionStateHash = 0;
+                _hasLockedFaceRotation = false;
+                ResumeScheduleMovement();
             }
         }
 
@@ -253,11 +350,16 @@ namespace Dormitory7.NPC
 
         protected override void OnGameTimeUpdated(int day, float hour)
         {
+            if (IsArmWrestlingActive || _isPlayingInteractionAnim) return;
             EvaluateScheduleForHour(hour, warpImmediately: false);
         }
 
         protected override void OnNewDayStarted(int newDay)
         {
+            _isPlayingInteractionAnim = false;
+            _hasEnteredInteractionState = false;
+            _activeInteractionStateHash = 0;
+            _hasLockedFaceRotation = false;
             ProcessEndOfDayEvaluation();
             float morningHour = dayTimeController != null ? dayTimeController.CurrentHour : 8f;
             EvaluateScheduleForHour(morningHour, warpImmediately: true);
@@ -294,8 +396,23 @@ namespace Dormitory7.NPC
             OnMoodChanged?.Invoke(Mood);
         }
 
+        private void TriggerFlex() => TriggerAnimator(FlexHash);
+
+        private void TriggerAnimator(int triggerHash)
+        {
+            if (characterAnimator != null && characterAnimator.isActiveAndEnabled && characterAnimator.runtimeAnimatorController != null)
+            {
+                characterAnimator.SetTrigger(triggerHash);
+            }
+        }
+
         private void UpdateMoodVisuals()
         {
+            if (characterAnimator != null && characterAnimator.isActiveAndEnabled && characterAnimator.runtimeAnimatorController != null)
+            {
+                characterAnimator.SetBool(IsAngryHash, Mood == GymBossMood.Angry);
+            }
+
             Color c = Mood switch
             {
                 GymBossMood.Pleased => MoodPleasedColor,
@@ -400,7 +517,7 @@ namespace Dormitory7.NPC
                     GiftsGivenToday++;
                     stats?.ModifyRespect(giftBonus);
                     SetMood(GymBossMood.Pleased);
-                    _handshakeAnimTimer = 0.7f;
+                    BeginInteractionAnimation(ConsumeHash, ConsumeStateHash, facePlayerOnce: true);
                     OnGiftReceived?.Invoke(active, giftBonus);
                     HudController.Instance?.ShowToast(
                         $"Бос качалки: «Оце підгон — {giftName}! Повага, першокурсник!» (+{Mathf.RoundToInt(giftBonus)} Респекту)");
@@ -418,7 +535,7 @@ namespace Dormitory7.NPC
 
                 stats?.ModifyRespect(gain);
                 SetMood(GymBossMood.Pleased);
-                _handshakeAnimTimer = 0.85f;
+                BeginInteractionAnimation(facePlayerOnce: true);
                 AudioManager.Instance?.PlayBossHandshake(transform.position + Vector3.up * 1.3f);
                 OnPlayerGreeted?.Invoke(morningBonus, gain);
 
@@ -435,6 +552,7 @@ namespace Dormitory7.NPC
                 GymEquipment bench = FindBenchPress();
                 if (bench != null)
                 {
+                    BeginInteractionAnimation(facePlayerOnce: true);
                     HudController.Instance?.ShowToast("БОС КАЧАЛКИ: «П'ятничний екзамен! Покажи, на що здатен на жимі!»");
                     bench.StartBossChallenge(context);
                 }
@@ -450,6 +568,9 @@ namespace Dormitory7.NPC
 
         public void StartArmWrestling(PlayerContext context)
         {
+            _isPlayingInteractionAnim = false;
+            _hasEnteredInteractionState = false;
+            _activeInteractionStateHash = 0;
             _armWrestleCtx = context;
             IsArmWrestlingActive = true;
             ArmWrestleMeter = 0.5f;
@@ -457,6 +578,10 @@ namespace Dormitory7.NPC
             _armWrestleNeedleDir = 1f;
 
             StopMovement();
+            if (navAgent != null && navAgent.isOnNavMesh)
+                navAgent.velocity = Vector3.zero;
+            LockFaceDirectionTowardPlayer();
+
             _armWrestleCtx.Controller?.SetMovementLocked(true);
             _armWrestleCtx.Inventory?.SetInputLocked(true);
             GameStateManager.Instance?.RegisterActiveQte(CancelArmWrestleFromEsc);
@@ -464,6 +589,7 @@ namespace Dormitory7.NPC
             _armPushAction?.Enable();
             _armCancelAction?.Enable();
 
+            TriggerFlex();
             AudioManager.Instance?.PlayBossHandshake(transform.position + Vector3.up * 1.2f);
             PushArmWrestleHud();
         }
@@ -471,7 +597,7 @@ namespace Dormitory7.NPC
         private void CancelArmWrestleFromEsc()
         {
             if (!IsArmWrestlingActive) return;
-            StopArmWrestleCleanly();
+            StopArmWrestleCleanly(resumeSchedule: true);
             HudController.Instance?.ShowToast("Армреслінг скасовано. Бос усміхнувся: «Іншим разом!»");
         }
 
@@ -522,7 +648,6 @@ namespace Dormitory7.NPC
             float strMult = stats != null ? stats.StrengthSpeedMultiplier : 1f;
             float push = (inSweetSpot ? 0.14f : 0.06f) * strMult;
             ArmWrestleMeter = Mathf.Clamp01(ArmWrestleMeter + push);
-            _handshakeAnimTimer = 0.22f;
             if (ArmWrestleMeter >= 1f)
                 FinishArmWrestling(playerWon: true);
         }
@@ -530,7 +655,7 @@ namespace Dormitory7.NPC
         public void FinishArmWrestling(bool playerWon)
         {
             if (!IsArmWrestlingActive) return;
-            StopArmWrestleCleanly();
+            StopArmWrestleCleanly(resumeSchedule: false);
 
             LastArmWrestleDay = dayTimeController != null ? dayTimeController.CurrentDay : 1;
             DormStatsManager stats = _armWrestleCtx.Stats ?? statsManager;
@@ -540,7 +665,7 @@ namespace Dormitory7.NPC
                 float winResp = balanceConfig != null ? balanceConfig.armWrestleWinRespect : 12f;
                 stats?.ModifyRespect(winResp);
                 SetMood(GymBossMood.Pleased);
-                _handshakeAnimTimer = 0.9f;
+                BeginInteractionAnimation(facePlayerOnce: false);
                 AudioManager.Instance?.PlayBossHandshake(transform.position + Vector3.up * 1.3f);
                 HudController.Instance?.ShowToast(
                     $"ПЕРЕМОГА В АРМРЕСЛІНГУ! Ти поклав руку Боса качалки! (+{Mathf.RoundToInt(winResp)} Респекту)");
@@ -555,6 +680,7 @@ namespace Dormitory7.NPC
                 float loseEnergy = balanceConfig != null ? balanceConfig.armWrestleLoseEnergy : 8f;
                 stats?.ModifyRespect(-loseResp);
                 stats?.ModifyEnergy(-loseEnergy);
+                BeginInteractionAnimation(facePlayerOnce: false);
                 HudController.Instance?.ShowToast(
                     $"Бос поклав твою руку! (-{Mathf.RoundToInt(loseEnergy)}% Енергії, -{Mathf.RoundToInt(loseResp)} Респекту). Підкачай Силу на штанзі!");
             }
@@ -562,7 +688,7 @@ namespace Dormitory7.NPC
             OnArmWrestleFinished?.Invoke(playerWon);
         }
 
-        private void StopArmWrestleCleanly()
+        private void StopArmWrestleCleanly(bool resumeSchedule = true)
         {
             GameStateManager.Instance?.UnregisterActiveQte(CancelArmWrestleFromEsc);
             IsArmWrestlingActive = false;
@@ -571,6 +697,18 @@ namespace Dormitory7.NPC
             _armWrestleCtx.Controller?.SetMovementLocked(false);
             _armWrestleCtx.Inventory?.SetInputLocked(false);
             HudController.Instance?.HideQte();
+
+            if (resumeSchedule && isActiveAndEnabled)
+                ResumeScheduleMovement();
+        }
+
+        private void ResumeScheduleMovement()
+        {
+            if (dayTimeController != null)
+                CurrentSlot = ResolveSlotForHour(dayTimeController.CurrentHour);
+
+            _scheduleInitialized = true;
+            MoveToZone(SlotToZone(CurrentSlot), walkSpeed);
         }
 
         private void PushArmWrestleHud()

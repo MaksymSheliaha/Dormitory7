@@ -40,10 +40,10 @@ namespace Dormitory7.Data
         public float crouchSpeed = 2.2f;
         public float jumpHeight = 1.15f;
         public float gravity = -20f;
-        public float standingHeight = 1.8f;
-        public float crouchHeight = 1.05f;
-        public float standingCameraY = 1.62f;
-        public float crouchCameraY = 0.92f;
+        public float standingHeight = 1.74f;
+        public float crouchHeight = 1.02f;
+        public float standingCameraY = 1.55f;
+        public float crouchCameraY = 0.89f;
         public float crouchTransitionSpeed = 10f;
         public float mouseSensitivity = 0.14f;
         public float gamepadLookSpeed = 140f;

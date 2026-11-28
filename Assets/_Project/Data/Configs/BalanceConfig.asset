@@ -37,10 +37,10 @@ MonoBehaviour:
   crouchSpeed: 2.2
   jumpHeight: 1.15
   gravity: -20
-  standingHeight: 1.8
-  crouchHeight: 1.05
-  standingCameraY: 1.62
-  crouchCameraY: 0.92
+  standingHeight: 1.74
+  crouchHeight: 1.02
+  standingCameraY: 1.55
+  crouchCameraY: 0.89
   crouchTransitionSpeed: 10
   mouseSensitivity: 0.14
   gamepadLookSpeed: 140
